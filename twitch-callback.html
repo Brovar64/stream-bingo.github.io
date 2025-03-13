@@ -94,6 +94,33 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        .debug-info {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #999;
+            text-align: left;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+        }
+        
+        .debug-info h3 {
+            margin-top: 0;
+            color: #ccc;
+            font-size: 1rem;
+        }
+        
+        .debug-info p {
+            margin: 5px 0;
+            color: #aaa;
+        }
+        
+        .debug-info .value {
+            color: #fff;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -144,18 +171,41 @@
             `;
         }
         
-        function showError(message, error) {
+        function showError(message, error, showDebugInfo = true) {
             const container = document.getElementById('authContainer');
             const errorDetails = error ? `<br>Error details: ${error.message || 'Unknown error'}` : '';
             
-            container.innerHTML = `
+            let html = `
                 <h1>Authentication Failed</h1>
                 <p>${message}</p>
                 <div class="status error">
                     There was a problem completing the authentication.${errorDetails}
                 </div>
-                <a href="index.html" class="btn">Return to Login</a>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                    <a href="index.html" class="btn">Return to Login</a>
+                    <a href="debug.html" class="btn" style="background-color: #333;">Debug Tools</a>
+                </div>
             `;
+            
+            if (showDebugInfo) {
+                const clientId = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+                const hostname = window.location.hostname;
+                const expectedRedirectUri = (hostname === 'localhost' || hostname === '127.0.0.1') 
+                    ? 'http://localhost:8080/twitch-callback.html'
+                    : 'https://brovar64.github.io/stream-bingo/twitch-callback.html';
+                
+                html += `
+                    <div class="debug-info">
+                        <h3>Troubleshooting Information</h3>
+                        <p>Client ID: <span class="value">${clientId}</span></p>
+                        <p>Expected Redirect URI: <span class="value">${expectedRedirectUri}</span></p>
+                        <p>Actual URL: <span class="value">${window.location.href}</span></p>
+                        <p>Please ensure this exact redirect URI is registered in your Twitch Developer Console.</p>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
             
             if (error) {
                 console.error('Authentication error:', error);
@@ -167,6 +217,28 @@
             log('Page loaded, checking for auth token...');
             
             const TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+            
+            // Check for error parameters first
+            const queryParams = new URLSearchParams(window.location.search);
+            if (queryParams.has('error')) {
+                const error = queryParams.get('error');
+                const errorDescription = queryParams.get('error_description');
+                
+                log(`Error detected: ${error} - ${errorDescription}`, true);
+                
+                if (error === 'redirect_mismatch') {
+                    showError('Redirect URI Mismatch Error', {
+                        message: 'The redirect URI in your request does not match the one registered in your Twitch Developer Console. ' +
+                        'Please update your Twitch Developer Console to include the exact redirect URI shown below.'
+                    });
+                    return;
+                } else {
+                    showError(`Twitch Authentication Error: ${error}`, {
+                        message: errorDescription || 'No error description provided'
+                    });
+                    return;
+                }
+            }
             
             // Extract the access token from the URL hash
             const hash = window.location.hash.substring(1);
