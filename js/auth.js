@@ -3,6 +3,7 @@ class AuthManager {
     constructor() {
         this.currentUser = null;
         this.TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+        
         // Make sure this exactly matches one of your configured redirect URLs
         const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
             ? 'http://localhost:8080'
@@ -11,7 +12,10 @@ class AuthManager {
         // Use the dedicated callback page
         this.REDIRECT_URI = `${baseUrl}/twitch-callback.html`;
         
-        console.log('Auth Manager initialized with redirect URI:', this.REDIRECT_URI);
+        // Log the redirect URI to make it very clear what we're using
+        console.log('=== TWITCH REDIRECT URI ===');
+        console.log(this.REDIRECT_URI);
+        console.log('==========================');
         
         // Check for existing login
         const isHandlingCallback = this.checkForAuthCallback();
@@ -68,9 +72,15 @@ class AuthManager {
     // Initiate Twitch login
     loginWithTwitch() {
         console.log('Initiating Twitch login...');
+        
+        // Double check our redirect URI before sending
+        console.log('Using redirect URI:', this.REDIRECT_URI);
+        
         const scopes = 'user:read:email';
         const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${this.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&response_type=token&scope=${scopes}`;
         console.log('Redirecting to:', authUrl);
+        
+        // Navigate to Twitch for authentication
         window.location.href = authUrl;
     }
 
