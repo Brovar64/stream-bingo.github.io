@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
 
+
+
 class StreamBingo {
     constructor() {
         this.app = document.getElementById('app');
@@ -14,6 +16,9 @@ class StreamBingo {
         this.bingoWords = [];
         this.bingoGrid = [];
         this.bingoSize = 3; // Default grid size
+
+        // Add debug logging
+        this.debug = true;
     }
 
     init() {
@@ -161,11 +166,13 @@ class StreamBingo {
                 return;
             }
 
-            // Create room in Firebase
+            // Create room in Firebase with new data structure
             await db.collection('rooms').doc(roomCode).set({
                 adminId: nickname,
                 gridSize: gridSize,
                 words: [],
+                approvedWords: [],  // New: tracks approved word indexes
+                pendingWords: {},   // New: maps word indexes to arrays of player names
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -178,9 +185,9 @@ class StreamBingo {
             this.currentRoom = roomCode;
             this.isAdmin = true;
             this.bingoSize = gridSize;
-            
+
             sessionStorage.setItem('streamBingoUser', JSON.stringify(this.currentUser));
-            
+
             // Show admin dashboard
             this.showAdminDashboard();
         } catch (error) {
@@ -198,6 +205,8 @@ class StreamBingo {
             return;
         }
 
+        this.log('Joining room:', roomCode, 'as', nickname);
+
         try {
             // Check if room exists
             const roomExists = await this.checkRoomExists(roomCode);
@@ -209,10 +218,10 @@ class StreamBingo {
             // Get room data
             const roomDoc = await db.collection('rooms').doc(roomCode).get();
             const roomData = roomDoc.data();
-            
+
             // Check if user is admin
             const isAdmin = roomData.adminId === nickname;
-            
+
             // Save user to session
             this.currentUser = {
                 nickname: nickname,
@@ -222,43 +231,16 @@ class StreamBingo {
             this.currentRoom = roomCode;
             this.isAdmin = isAdmin;
             this.bingoSize = roomData.gridSize;
-            
+
             sessionStorage.setItem('streamBingoUser', JSON.stringify(this.currentUser));
-            
-            // Check if player already exists, if not create them
-            const playerRef = db.collection('rooms').doc(roomCode)
-                .collection('players').doc(nickname);
-            
-            const playerDoc = await playerRef.get();
-            
-            if (!playerDoc.exists && !isAdmin) {
-                // Generate bingo card for the player
-                const words = roomData.words || [];
-                
-                if (words.length < this.bingoSize * this.bingoSize) {
-                    this.showNotification('Room is not fully set up yet. Please try again later.');
-                    return;
-                }
-                
-                // Shuffle and slice words for this player's card
-                const shuffledWords = this.shuffleArray([...words]);
-                const bingoGrid = shuffledWords.slice(0, this.bingoSize * this.bingoSize);
-                
-                // Create player document
-                await playerRef.set({
-                    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    bingoGrid: bingoGrid,
-                    markedCells: []
-                });
-            }
-            
+
             // Show appropriate interface
             if (isAdmin) {
                 this.showAdminDashboard();
             } else {
                 this.showPlayerGame();
             }
-            
+
         } catch (error) {
             console.error('Error joining room:', error);
             this.showNotification('Error joining room. Please try again.');
@@ -270,87 +252,363 @@ class StreamBingo {
             // Get room data
             const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
             const roomData = roomDoc.data();
-            
+
             this.bingoSize = roomData.gridSize;
             this.bingoWords = roomData.words || [];
-            
-            let wordListHTML = '';
-            
+            const approvedWords = roomData.approvedWords || [];
+            const pendingWords = roomData.pendingWords || {};
+
+            // Generate HTML for the bingo words
+            let wordsHTML = '';
+
             if (this.bingoWords.length > 0) {
-                wordListHTML = `
-                    <div class="words-container" style="margin-top: 1rem;">
-                        <h3 style="margin-bottom: 1rem;">Bingo Words</h3>
-                        <ul class="player-list">
-                            ${this.bingoWords.map((word, index) => `
-                                <li class="player-item">${word}</li>
-                            `).join('')}
-                        </ul>
-                        
-                        <button id="editWords" class="btn btn-secondary" style="margin-top: 1rem;">Edit Words</button>
-                    </div>
-                `;
-            }
-            
-            this.app.innerHTML = `
-                <div class="container">
-                    <h1 class="title">Admin Dashboard</h1>
-                    <p class="subtitle">Room Code: <strong>${this.currentRoom}</strong></p>
-                    
-                    <div style="margin-bottom: 2rem;">
-                        <div id="wordSetup">
-                            ${this.bingoWords.length === 0 ? `
-                                <h3>Add Bingo Words</h3>
-                                <p style="margin-bottom: 1rem;">You need at least ${this.bingoSize * this.bingoSize} words for the bingo cards.</p>
-                                
-                                <div class="form-group">
-                                    <label for="bingoWords">Enter one word or phrase per line:</label>
-                                    <textarea id="bingoWords" class="form-control" rows="10" placeholder="Enter bingo words here, one per line"></textarea>
+                wordsHTML = `
+                <div class="words-container" style="margin-top: 1rem;">
+                    <h3 style="margin-bottom: 1rem;">Bingo Words</h3>
+                    <div class="bingo-words-grid">
+                        ${this.bingoWords.map((word, index) => {
+                    const isApproved = approvedWords.includes(index);
+                    const pendingPlayers = pendingWords[index] || [];
+
+                    return `
+                                <div class="bingo-word ${isApproved ? 'approved' : ''}" 
+                                     data-index="${index}" data-word="${word}">
+                                    <span class="word-text">${word}</span>
+                                    
+                                    ${isApproved ?
+                        '<span class="approved-indicator">✓</span>' : ''}
+                                    
+                                    ${pendingPlayers.length > 0 ?
+                        `<div class="player-indicators">
+                                            ${pendingPlayers.map(player =>
+                            `<div class="player-icon" title="${player}">${player.charAt(0).toUpperCase()}</div>`
+                        ).join('')}
+                                        </div>` : ''}
                                 </div>
-                                
-                                <button id="saveWords" class="btn btn-primary">Save Words</button>
-                            ` : wordListHTML}
-                        </div>
+                            `;
+                }).join('')}
                     </div>
-                    
-                    <div id="playersSection">
-                        <h3>Players</h3>
-                        <div class="admin-panel">
-                            <div class="admin-sidebar">
-                                <h4 style="margin-bottom: 1rem;">Players List</h4>
-                                <ul id="playersList" class="player-list">
-                                    <li>Loading players...</li>
-                                </ul>
-                            </div>
-                            
-                            <div class="admin-main" id="selectedPlayerView">
-                                <p>Select a player to view their bingo card</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button id="leaveRoom" class="btn btn-secondary" style="margin-top: 2rem;">Leave Room</button>
                 </div>
             `;
-
-            // Add event listeners
-            if (this.bingoWords.length === 0) {
-                document.getElementById('saveWords').addEventListener('click', () => this.saveWords());
             } else {
-                document.getElementById('editWords').addEventListener('click', () => this.showEditWords());
+                wordsHTML = `
+                <h3>Add Bingo Words</h3>
+                <p style="margin-bottom: 1rem;">You need at least ${this.bingoSize * this.bingoSize} words for the bingo cards.</p>
+                
+                <div class="form-group">
+                    <label for="bingoWords">Enter one word or phrase per line:</label>
+                    <textarea id="bingoWords" class="form-control" rows="10" placeholder="Enter bingo words here, one per line"></textarea>
+                </div>
+                
+                <button id="saveWords" class="btn btn-primary">Save Words</button>
+            `;
+            }
+
+            // Generate the full admin UI
+            this.app.innerHTML = `
+            <div class="container">
+                <h1 class="title">Admin Dashboard</h1>
+                <p class="subtitle">Room Code: <strong>${this.currentRoom}</strong></p>
+                
+                <div style="margin-bottom: 2rem;">
+                    <div id="wordSetup">
+                        ${wordsHTML}
+                    </div>
+                </div>
+                
+                <div id="playersSection">
+                    <h3>Players</h3>
+                    <div class="admin-panel">
+                        <div class="admin-sidebar">
+                            <h4 style="margin-bottom: 1rem;">Players List</h4>
+                            <ul id="playersList" class="player-list">
+                                <li>Loading players...</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="admin-main" id="selectedPlayerView">
+                            <p>Select a player to view their bingo card</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="leaveRoom" class="btn btn-secondary" style="margin-top: 2rem;">Leave Room</button>
+            </div>
+        `;
+
+            // Add CSS for the new elements
+            const style = document.createElement('style');
+            style.textContent = `
+            .bingo-words-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
             }
             
-            document.getElementById('leaveRoom').addEventListener('click', () => this.leaveRoom());
+            .bingo-word {
+                background-color: #2D2D2D;
+                border-radius: 8px;
+                padding: 12px;
+                position: relative;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
             
+            .bingo-word:hover {
+                background-color: #3A3A3A;
+            }
+            
+            .bingo-word.approved {
+                background-color: #4CAF50;
+                color: white;
+            }
+            
+            .approved-indicator {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            
+            .player-indicators {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                margin-top: 8px;
+            }
+            
+            .player-icon {
+                width: 24px;
+                height: 24px;
+                background-color: #FF4081;
+                color: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 12px;
+            }
+        `;
+            document.head.appendChild(style);
+
+            // Add event listeners for bingo words
+            if (this.bingoWords.length > 0) {
+                document.querySelectorAll('.bingo-word').forEach(wordElement => {
+                    wordElement.addEventListener('click', () => {
+                        const index = parseInt(wordElement.dataset.index);
+                        this.toggleWordApproval(index);
+                    });
+                });
+            } else {
+                document.getElementById('saveWords').addEventListener('click', () => this.saveWords());
+            }
+
+            document.getElementById('leaveRoom').addEventListener('click', () => this.leaveRoom());
+
             // Load players list
             this.loadPlayersList();
-            
-            // Set up real-time updates for players list
-            this.setupPlayersListener();
+
+            // Set up real-time updates
+            setTimeout(() => {
+                this.setupRoomListener();
+                this.setupPlayersListener();
+            }, 100);
         } catch (error) {
             console.error('Error showing admin dashboard:', error);
             this.showNotification('Error loading admin dashboard');
         }
     }
+
+
+    setupRoomListener() {
+        console.log('Setting up room listener for real-time updates');
+
+        if (this.roomUnsubscribe) {
+            this.roomUnsubscribe();
+        }
+
+        this.roomUnsubscribe = db.collection('rooms').doc(this.currentRoom)
+            .onSnapshot({
+                includeMetadataChanges: true
+            }, async (doc) => {
+                console.log('Room update received!', new Date().toISOString());
+
+                if (doc.exists) {
+                    const roomData = doc.data();
+
+                    // Update bingo words grid
+                    const wordElements = document.querySelectorAll('.bingo-word');
+                    if (wordElements.length > 0) {
+                        const approvedWords = roomData.approvedWords || [];
+                        const pendingWords = roomData.pendingWords || {};
+
+                        console.log('Processing room update:',
+                            'Approved:', approvedWords.length,
+                            'Pending:', Object.keys(pendingWords).length);
+
+                        wordElements.forEach(wordElement => {
+                            const index = parseInt(wordElement.dataset.index);
+                            const pendingPlayers = pendingWords[index] || [];
+
+                            // Update approved status
+                            if (approvedWords.includes(index)) {
+                                wordElement.classList.add('approved');
+                                if (!wordElement.querySelector('.approved-indicator')) {
+                                    const indicator = document.createElement('span');
+                                    indicator.className = 'approved-indicator';
+                                    indicator.textContent = '✓';
+                                    wordElement.appendChild(indicator);
+                                }
+                            } else {
+                                wordElement.classList.remove('approved');
+                                const indicator = wordElement.querySelector('.approved-indicator');
+                                if (indicator) {
+                                    indicator.remove();
+                                }
+                            }
+
+                            // Update pending players
+                            let indicators = wordElement.querySelector('.player-indicators');
+                            if (pendingPlayers.length > 0) {
+                                if (!indicators) {
+                                    indicators = document.createElement('div');
+                                    indicators.className = 'player-indicators';
+                                    wordElement.appendChild(indicators);
+                                }
+
+                                indicators.innerHTML = pendingPlayers.map(player =>
+                                    `<div class="player-icon" title="${player}">${player.charAt(0).toUpperCase()}</div>`
+                                ).join('');
+                            } else if (indicators) {
+                                indicators.remove();
+                            }
+                        });
+                    }
+
+                    // IMPORTANT: Update the selected player's view if one is selected
+                    if (this.selectedPlayer) {
+                        // Get fresh player data for this player
+                        const playerDoc = await db.collection('rooms')
+                            .doc(this.currentRoom)
+                            .collection('players')
+                            .doc(this.selectedPlayer)
+                            .get();
+
+                        if (playerDoc.exists) {
+                            // Update the selected player's view
+                            this.updatePlayerBingoCard(this.selectedPlayer, playerDoc.data(), roomData);
+                        }
+                    }
+                }
+            }, error => {
+                console.error('Error in room listener:', error);
+            });
+    }
+
+    // Add this method if it's missing
+    setupPlayerListener() {
+        this.log('Setting up player listener');
+
+        // Listen for changes to the room document (for approved words)
+        if (this.roomUnsubscribe) {
+            this.roomUnsubscribe();
+        }
+
+        // First get the player data to get the bingoGrid
+        const playerRef = db.collection('rooms').doc(this.currentRoom)
+            .collection('players').doc(this.currentUser.nickname);
+
+        playerRef.get().then(playerDoc => {
+            if (playerDoc.exists) {
+                const playerData = playerDoc.data();
+                this.bingoGrid = playerData.bingoGrid || [];
+
+                // Now listen for room changes
+                this.roomUnsubscribe = db.collection('rooms').doc(this.currentRoom)
+                    .onSnapshot(roomDoc => {
+                        if (roomDoc.exists) {
+                            const roomData = roomDoc.data();
+                            const approvedWords = roomData.approvedWords || [];
+                            const pendingWords = roomData.pendingWords || {};
+
+                            // Update player's grid based on approved words
+                            const cells = document.querySelectorAll('.bingo-cell');
+
+                            cells.forEach(cell => {
+                                const index = parseInt(cell.dataset.index);
+                                const word = this.bingoGrid[index];
+                                const wordIndex = roomData.words.indexOf(word);
+
+                                // Reset cell state
+                                cell.classList.remove('marked', 'pending');
+                                cell.innerHTML = word;
+
+                                // Mark as approved if word is approved
+                                if (approvedWords.includes(wordIndex)) {
+                                    cell.classList.add('marked');
+                                }
+                                // Mark as pending if this player has requested it
+                                else if (
+                                    pendingWords[wordIndex] &&
+                                    pendingWords[wordIndex].includes(this.currentUser.nickname)
+                                ) {
+                                    cell.classList.add('pending');
+                                    cell.innerHTML = word +
+                                        '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>';
+                                }
+                            });
+
+                            // Update markedCells for bingo checking
+                            const markedCells = [];
+                            cells.forEach((cell, index) => {
+                                if (cell.classList.contains('marked')) {
+                                    markedCells.push(index);
+                                }
+                            });
+
+                            // Check for bingo
+                            const hasBingo = this.checkBingo(markedCells, this.bingoSize);
+
+                            // Update bingo notification
+                            const bingoContainer = document.querySelector('.container');
+                            let bingoNotification = document.querySelector('.container > div:nth-child(3)');
+
+                            if (bingoNotification && !bingoNotification.textContent.includes('BINGO')) {
+                                bingoNotification = null;
+                            }
+
+                            if (hasBingo && !bingoNotification) {
+                                const notificationDiv = document.createElement('div');
+                                notificationDiv.style.backgroundColor = '#FF4081';
+                                notificationDiv.style.color = 'white';
+                                notificationDiv.style.padding = '1rem';
+                                notificationDiv.style.borderRadius = '8px';
+                                notificationDiv.style.marginBottom = '1rem';
+
+                                notificationDiv.innerHTML = `<h2 style="margin: 0;">BINGO! 🎉</h2>`;
+
+                                const gridElement = document.querySelector('.bingo-grid');
+                                bingoContainer.insertBefore(notificationDiv, gridElement);
+                            } else if (!hasBingo && bingoNotification) {
+                                bingoNotification.remove();
+                            }
+                        }
+                    });
+            }
+        }).catch(error => {
+            console.error('Error setting up player listener:', error);
+        });
+    }
+
+// Add/update the log method if needed
+    log(...args) {
+        if (this.debug) console.log('[StreamBingo]', ...args);
+    }
+
+// Make sure constructor includes debug flag
+
 
     async loadPlayersList() {
         try {
@@ -391,99 +649,35 @@ class StreamBingo {
         }
     }
 
-    setupPlayersListener() {
-        db.collection('rooms').doc(this.currentRoom)
-            .collection('players')
-            .onSnapshot(snapshot => {
-                this.loadPlayersList();
-                
-                // Refresh selected player view if one is selected
-                if (this.selectedPlayer) {
-                    this.showPlayerBingoCard(this.selectedPlayer);
-                }
-            });
-    }
 
     async showPlayerBingoCard(playerId) {
         try {
             this.selectedPlayer = playerId;
-            
+
             const playerDoc = await db.collection('rooms').doc(this.currentRoom)
                 .collection('players').doc(playerId).get();
-                
+
             if (!playerDoc.exists) {
                 document.getElementById('selectedPlayerView').innerHTML = `
-                    <p>Player not found</p>
-                `;
+                <p>Player not found</p>
+            `;
                 return;
             }
-            
+
             const playerData = playerDoc.data();
-            const bingoGrid = playerData.bingoGrid || [];
-            const markedCells = playerData.markedCells || [];
-            
-            let gridHTML = `
-                <h3>${playerId}'s Bingo Card</h3>
-                <div class="bingo-grid grid-${this.bingoSize}" style="margin-top: 1rem; margin-bottom: 1rem;">
-            `;
-            
-            bingoGrid.forEach((word, index) => {
-                const isMarked = markedCells.includes(index);
-                const pendingMarks = playerData.pendingMarks || [];
-                const isPending = pendingMarks.includes(index);
-                
-                gridHTML += `
-                    <div class="bingo-cell ${isMarked ? 'marked' : ''} ${isPending ? 'pending' : ''}" 
-                         data-index="${index}" data-player="${playerId}">
-                        ${word}
-                        ${isPending ? `
-                            <div style="margin-top: 0.5rem;">
-                                <button class="approve-mark" data-index="${index}" data-player="${playerId}">✓</button>
-                                <button class="reject-mark" data-index="${index}" data-player="${playerId}">✗</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            });
-            
-            gridHTML += `</div>`;
-            
-            // Check if player has bingo
-            const hasBingo = this.checkBingo(markedCells, this.bingoSize);
-            
-            if (hasBingo) {
-                gridHTML += `
-                    <div style="background-color: #FF4081; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">BINGO! 🎉</h3>
-                    </div>
-                `;
-            }
-            
-            document.getElementById('selectedPlayerView').innerHTML = gridHTML;
-            
-            // Add event listeners for approve/reject buttons
-            document.querySelectorAll('.approve-mark').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const index = parseInt(button.dataset.index);
-                    const playerId = button.dataset.player;
-                    this.approveMark(playerId, index);
-                });
-            });
-            
-            document.querySelectorAll('.reject-mark').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const index = parseInt(button.dataset.index);
-                    const playerId = button.dataset.player;
-                    this.rejectMark(playerId, index);
-                });
-            });
-            
+
+            // Get room data for approved words
+            const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
+            const roomData = roomDoc.data();
+
+            // Use the new update method
+            this.updatePlayerBingoCard(playerId, playerData, roomData);
+
         } catch (error) {
             console.error('Error showing player bingo card:', error);
         }
     }
+
 
     async approveMark(playerId, index) {
         try {
@@ -667,68 +861,109 @@ class StreamBingo {
     }
 
     async showPlayerGame() {
+        this.log('Showing player game view');
         try {
-            // Get player data
-            const playerDoc = await db.collection('rooms').doc(this.currentRoom)
-                .collection('players').doc(this.currentUser.nickname).get();
-                
-            if (!playerDoc.exists) {
-                this.showNotification('Player not found');
+            // Get room data first to confirm grid size
+            const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
+            if (!roomDoc.exists) {
+                this.showNotification('Room not found');
                 this.leaveRoom();
                 return;
             }
-            
-            const playerData = playerDoc.data();
-            const bingoGrid = playerData.bingoGrid || [];
+
+            const roomData = roomDoc.data();
+            this.bingoSize = roomData.gridSize;
+            this.log('Room found, grid size:', this.bingoSize);
+
+            // Get player data
+            const playerRef = db.collection('rooms').doc(this.currentRoom)
+                .collection('players').doc(this.currentUser.nickname);
+
+            const playerDoc = await playerRef.get();
+
+            if (!playerDoc.exists) {
+                this.log('Player not found, creating player entry');
+                // Create player if they don't exist
+                if (roomData.words && roomData.words.length >= this.bingoSize * this.bingoSize) {
+                    // Generate bingo card for the player
+                    const shuffledWords = this.shuffleArray([...roomData.words]);
+                    this.bingoGrid = shuffledWords.slice(0, this.bingoSize * this.bingoSize);
+
+                    // Create player document
+                    await playerRef.set({
+                        nickname: this.currentUser.nickname,
+                        joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        bingoGrid: this.bingoGrid,
+                        markedCells: [],
+                        pendingMarks: []
+                    });
+                    this.log('Created new player entry with grid');
+                } else {
+                    this.showNotification('Room not fully set up yet');
+                    this.leaveRoom();
+                    return;
+                }
+            } else {
+                const playerData = playerDoc.data();
+                this.bingoGrid = playerData.bingoGrid || [];
+                this.log('Found existing player data');
+            }
+
+            if (!this.bingoGrid || this.bingoGrid.length === 0) {
+                this.log('ERROR: No bingo grid available');
+                this.showNotification('Error loading bingo card');
+                this.leaveRoom();
+                return;
+            }
+
+            // Get markedCells and pendingMarks
+            const latestPlayerDoc = await playerRef.get();
+            const playerData = latestPlayerDoc.data();
             const markedCells = playerData.markedCells || [];
             const pendingMarks = playerData.pendingMarks || [];
-            
-            // Get room data for grid size
-            const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
-            const roomData = roomDoc.data();
-            
-            this.bingoSize = roomData.gridSize;
-            
-            let gridHTML = `
-                <div class="bingo-grid grid-${this.bingoSize}">
-            `;
-            
-            bingoGrid.forEach((word, index) => {
+
+            // Render player UI
+            this.log('Rendering bingo grid with', this.bingoGrid.length, 'cells');
+            let gridHTML = `<div class="bingo-grid grid-${this.bingoSize}">`;
+
+            this.bingoGrid.forEach((word, index) => {
                 const isMarked = markedCells.includes(index);
                 const isPending = pendingMarks.includes(index);
-                
+
                 gridHTML += `
-                    <div class="bingo-cell ${isMarked ? 'marked' : ''} ${isPending ? 'pending' : ''}" 
-                         data-index="${index}" style="${isPending ? 'background-color: #FFA000;' : ''}">
-                        ${word}
-                        ${isPending ? '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>' : ''}
-                    </div>
-                `;
-            });
-            
-            gridHTML += `</div>`;
-            
-            // Check if player has bingo
-            const hasBingo = this.checkBingo(markedCells, this.bingoSize);
-            
-            this.app.innerHTML = `
-                <div class="container">
-                    <h1 class="title">Stream Bingo</h1>
-                    <p class="subtitle">Room: <strong>${this.currentRoom}</strong> | Player: <strong>${this.currentUser.nickname}</strong></p>
-                    
-                    ${hasBingo ? `
-                        <div style="background-color: #FF4081; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                            <h2 style="margin: 0;">BINGO! 🎉</h2>
-                        </div>
-                    ` : ''}
-                    
-                    ${gridHTML}
-                    
-                    <button id="leaveRoom" class="btn btn-secondary" style="margin-top: 2rem;">Leave Room</button>
+                <div class="bingo-cell ${isMarked ? 'marked' : ''} ${isPending ? 'pending' : ''}" 
+                     data-index="${index}" style="${isPending ? 'background-color: #FFA000;' : ''}">
+                    ${word}
+                    ${isPending ? '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>' : ''}
                 </div>
             `;
-            
+            });
+
+            gridHTML += `</div>`;
+
+            // Check if player has bingo
+            const hasBingo = this.checkBingo(markedCells, this.bingoSize);
+
+            // Build the complete UI
+            this.app.innerHTML = `
+            <div class="container">
+                <h1 class="title">Stream Bingo</h1>
+                <p class="subtitle">Room: <strong>${this.currentRoom}</strong> | Player: <strong>${this.currentUser.nickname}</strong></p>
+                
+                ${hasBingo ? `
+                    <div style="background-color: #FF4081; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h2 style="margin: 0;">BINGO! 🎉</h2>
+                    </div>
+                ` : ''}
+                
+                ${gridHTML}
+                
+                <button id="leaveRoom" class="btn btn-secondary" style="margin-top: 2rem;">Leave Room</button>
+            </div>
+        `;
+
             // Add event listeners
+            this.log('Adding cell click listeners');
             document.querySelectorAll('.bingo-cell').forEach(cell => {
                 cell.addEventListener('click', () => {
                     if (!cell.classList.contains('marked') && !cell.classList.contains('pending')) {
@@ -736,93 +971,76 @@ class StreamBingo {
                     }
                 });
             });
-            
+
             document.getElementById('leaveRoom').addEventListener('click', () => this.leaveRoom());
-            
+
             // Set up real-time updates
             this.setupPlayerListener();
-            
+            this.log('Player view setup complete');
+
         } catch (error) {
             console.error('Error showing player game:', error);
             this.showNotification('Error loading game');
+            setTimeout(() => this.leaveRoom(), 2000);
         }
-    }
-
-    setupPlayerListener() {
-        db.collection('rooms').doc(this.currentRoom)
-            .collection('players').doc(this.currentUser.nickname)
-            .onSnapshot(doc => {
-                if (doc.exists) {
-                    const playerData = doc.data();
-                    const markedCells = playerData.markedCells || [];
-                    const pendingMarks = playerData.pendingMarks || [];
-                    
-                    // Update UI based on changes
-                    document.querySelectorAll('.bingo-cell').forEach(cell => {
-                        const index = parseInt(cell.dataset.index);
-                        
-                        // Reset classes
-                        cell.classList.remove('marked', 'pending');
-                        cell.style.backgroundColor = '';
-                        cell.innerHTML = playerData.bingoGrid[index];
-                        
-                        if (markedCells.includes(index)) {
-                            cell.classList.add('marked');
-                        } else if (pendingMarks.includes(index)) {
-                            cell.classList.add('pending');
-                            cell.style.backgroundColor = '#FFA000';
-                            cell.innerHTML = playerData.bingoGrid[index] + 
-                                '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>';
-                        }
-                    });
-                    
-                    // Check for bingo
-                    const hasBingo = this.checkBingo(markedCells, this.bingoSize);
-                    
-                    // Update bingo notification
-                    const bingoNotification = document.querySelector('.container > div');
-                    
-                    if (hasBingo && !bingoNotification) {
-                        const notificationDiv = document.createElement('div');
-                        notificationDiv.style.backgroundColor = '#FF4081';
-                        notificationDiv.style.color = 'white';
-                        notificationDiv.style.padding = '1rem';
-                        notificationDiv.style.borderRadius = '8px';
-                        notificationDiv.style.marginBottom = '1rem';
-                        
-                        notificationDiv.innerHTML = `<h2 style="margin: 0;">BINGO! 🎉</h2>`;
-                        
-                        const container = document.querySelector('.container');
-                        container.insertBefore(notificationDiv, container.firstChild.nextSibling.nextSibling);
-                    } else if (!hasBingo && bingoNotification) {
-                        bingoNotification.remove();
-                    }
-                }
-            });
     }
 
     async markCell(index) {
         try {
             const playerRef = db.collection('rooms').doc(this.currentRoom)
                 .collection('players').doc(this.currentUser.nickname);
-                
+
             const playerDoc = await playerRef.get();
             const playerData = playerDoc.data();
-            
-            const pendingMarks = playerData.pendingMarks || [];
-            
-            // Add to pending
-            const updatedPending = [...pendingMarks, index];
-            
-            await playerRef.update({
-                pendingMarks: updatedPending
+
+            // Get the word that was clicked
+            const word = playerData.bingoGrid[index];
+
+            // Find the word's index in the room's word list
+            const roomRef = db.collection('rooms').doc(this.currentRoom);
+            const roomDoc = await roomRef.get();
+            const roomData = roomDoc.data();
+
+            const wordIndex = roomData.words.indexOf(word);
+
+            if (wordIndex === -1) {
+                this.showNotification('Word not found in bingo list');
+                return;
+            }
+
+            // Check if already approved
+            const approvedWords = roomData.approvedWords || [];
+            if (approvedWords.includes(wordIndex)) {
+                this.showNotification('This word is already approved!');
+                return;
+            }
+
+            // Add player to pending list for this word
+            let pendingWords = roomData.pendingWords || {};
+            pendingWords[wordIndex] = pendingWords[wordIndex] || [];
+
+            if (!pendingWords[wordIndex].includes(this.currentUser.nickname)) {
+                pendingWords[wordIndex].push(this.currentUser.nickname);
+            }
+
+            // Update the room document
+            await roomRef.update({
+                pendingWords: pendingWords
             });
-            
-            this.showNotification('Marked! Waiting for admin approval.');
-            
+
+            // Also update UI immediately for better UX
+            const cell = document.querySelector(`.bingo-cell[data-index="${index}"]`);
+            if (cell) {
+                cell.classList.add('pending');
+                cell.innerHTML = word +
+                    '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>';
+            }
+
+            this.showNotification('Requested approval for: ' + word);
+
         } catch (error) {
             console.error('Error marking cell:', error);
-            this.showNotification('Error marking cell');
+            this.showNotification('Error requesting approval');
         }
     }
 
@@ -868,6 +1086,17 @@ class StreamBingo {
     }
 
     leaveRoom() {
+        // Clean up listeners
+        if (this.playerUnsubscribe) {
+            this.playerUnsubscribe();
+            this.playerUnsubscribe = null;
+        }
+
+        if (this.playersUnsubscribe) {
+            this.playersUnsubscribe();
+            this.playersUnsubscribe = null;
+        }
+
         sessionStorage.removeItem('streamBingoUser');
         this.currentUser = null;
         this.currentRoom = null;
@@ -909,4 +1138,197 @@ class StreamBingo {
             notification.remove();
         }, 3000);
     }
+
+    async toggleWordApproval(wordIndex) {
+        try {
+            const roomRef = db.collection('rooms').doc(this.currentRoom);
+            const roomDoc = await roomRef.get();
+            const roomData = roomDoc.data();
+
+            let approvedWords = roomData.approvedWords || [];
+            let pendingWords = roomData.pendingWords || {};
+
+            // Toggle approved state
+            if (approvedWords.includes(wordIndex)) {
+                // Remove from approved
+                approvedWords = approvedWords.filter(index => index !== wordIndex);
+            } else {
+                // Add to approved
+                approvedWords.push(wordIndex);
+
+                // Clear any pending requests for this word
+                if (pendingWords[wordIndex]) {
+                    delete pendingWords[wordIndex];
+                }
+            }
+
+            // Create updated room data
+            const updatedRoomData = {
+                ...roomData,
+                approvedWords: approvedWords,
+                pendingWords: pendingWords
+            };
+
+            // Update the word element UI immediately
+            const wordElement = document.querySelector(`.bingo-word[data-index="${wordIndex}"]`);
+            if (wordElement) {
+                if (approvedWords.includes(wordIndex)) {
+                    wordElement.classList.add('approved');
+                    if (!wordElement.querySelector('.approved-indicator')) {
+                        const indicator = document.createElement('span');
+                        indicator.className = 'approved-indicator';
+                        indicator.textContent = '✓';
+                        wordElement.appendChild(indicator);
+                    }
+                } else {
+                    wordElement.classList.remove('approved');
+                    const indicator = wordElement.querySelector('.approved-indicator');
+                    if (indicator) {
+                        indicator.remove();
+                    }
+                }
+
+                // Remove any pending indicators
+                const pendingIndicators = wordElement.querySelector('.player-indicators');
+                if (pendingIndicators) {
+                    pendingIndicators.remove();
+                }
+            }
+
+            // If a player is selected, update their card immediately
+            if (this.selectedPlayer) {
+                const playerDoc = await db.collection('rooms')
+                    .doc(this.currentRoom)
+                    .collection('players')
+                    .doc(this.selectedPlayer)
+                    .get();
+
+                if (playerDoc.exists) {
+                    const playerData = playerDoc.data();
+
+                    // Update marked cells based on approved words
+                    let markedCells = [];
+                    const bingoGrid = playerData.bingoGrid || [];
+
+                    bingoGrid.forEach((word, index) => {
+                        const wordIdx = this.bingoWords.indexOf(word);
+                        if (approvedWords.includes(wordIdx)) {
+                            markedCells.push(index);
+                        }
+                    });
+
+                    // Update the player view immediately
+                    this.updatePlayerBingoCard(this.selectedPlayer, {
+                        ...playerData,
+                        markedCells: markedCells
+                    }, updatedRoomData);
+                }
+            }
+
+            // Now update the database
+            await roomRef.update({
+                approvedWords: approvedWords,
+                pendingWords: pendingWords
+            });
+
+            // Update all players' cards
+            const playersSnapshot = await db.collection('rooms').doc(this.currentRoom)
+                .collection('players').get();
+
+            const batch = db.batch();
+
+            playersSnapshot.forEach(playerDoc => {
+                const playerData = playerDoc.data();
+                const bingoGrid = playerData.bingoGrid || [];
+
+                // Find which cells in this player's grid match the approved words
+                let markedCells = [];
+                bingoGrid.forEach((word, index) => {
+                    // If this cell's word index is in the approved list
+                    if (approvedWords.includes(this.bingoWords.indexOf(word))) {
+                        markedCells.push(index);
+                    }
+                });
+
+                batch.update(playerDoc.ref, {
+                    markedCells: markedCells
+                });
+            });
+
+            await batch.commit();
+
+            const word = this.bingoWords[wordIndex];
+            this.showNotification(`${approvedWords.includes(wordIndex) ? 'Approved' : 'Unapproved'}: ${word}`);
+        } catch (error) {
+            console.error('Error toggling word approval:', error);
+            this.showNotification('Error updating word status');
+        }
+    }
+
+    updatePlayerBingoCard(playerId, playerData, roomData) {
+        const playerView = document.getElementById('selectedPlayerView');
+
+        // If no player view, return
+        if (!playerView) return;
+
+        const bingoGrid = playerData.bingoGrid || [];
+        const markedCells = playerData.markedCells || [];
+        const approvedWords = roomData.approvedWords || [];
+        const pendingWords = roomData.pendingWords || {};
+
+        // Check which cells should be marked based on approved words
+        const shouldBeMarked = [];
+        bingoGrid.forEach((word, index) => {
+            const wordIndex = this.bingoWords.indexOf(word);
+            if (approvedWords.includes(wordIndex)) {
+                shouldBeMarked.push(index);
+            }
+        });
+
+        // Find which cells have pending approval
+        const hasPendingApproval = [];
+        bingoGrid.forEach((word, index) => {
+            const wordIndex = this.bingoWords.indexOf(word);
+            const pendingPlayers = pendingWords[wordIndex] || [];
+            if (pendingPlayers.includes(playerId)) {
+                hasPendingApproval.push(index);
+            }
+        });
+
+        let gridHTML = `
+        <h3>${playerId}'s Bingo Card</h3>
+        <div class="bingo-grid grid-${this.bingoSize}" style="margin-top: 1rem; margin-bottom: 1rem;">
+    `;
+
+        bingoGrid.forEach((word, index) => {
+            const isMarked = shouldBeMarked.includes(index);
+            const isPending = hasPendingApproval.includes(index);
+
+            gridHTML += `
+            <div class="bingo-cell ${isMarked ? 'marked' : ''} ${isPending ? 'pending' : ''}" 
+                 data-index="${index}" data-player="${playerId}">
+                ${word}
+                ${isPending ? `
+                    <div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>
+                ` : ''}
+            </div>
+        `;
+        });
+
+        gridHTML += `</div>`;
+
+        // Check if player has bingo
+        const hasBingo = this.checkBingo(shouldBeMarked, this.bingoSize);
+
+        if (hasBingo) {
+            gridHTML += `
+            <div style="background-color: #FF4081; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">BINGO! 🎉</h3>
+            </div>
+        `;
+        }
+
+        playerView.innerHTML = gridHTML;
+    }
+
 }
