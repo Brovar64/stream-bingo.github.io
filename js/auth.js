@@ -4,9 +4,12 @@ class AuthManager {
         this.currentUser = null;
         this.TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
         // Make sure this exactly matches one of your configured redirect URLs
-        this.REDIRECT_URI = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? 'http://localhost:8080/index.html'
-            : 'https://brovar64.github.io/stream-bingo/index.html';
+        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:8080'
+            : 'https://brovar64.github.io/stream-bingo';
+            
+        // Use the dedicated callback page
+        this.REDIRECT_URI = `${baseUrl}/twitch-callback.html`;
         
         console.log('Auth Manager initialized with redirect URI:', this.REDIRECT_URI);
         
