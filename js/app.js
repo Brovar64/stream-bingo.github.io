@@ -1,20 +1,58 @@
 // Stream Bingo App
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing app...');
-    const app = new StreamBingo();
-    window.streamBingo = app;
-    
-    // Small delay to ensure Firebase and auth managers are initialized
-    setTimeout(() => {
-        app.init();
+    try {
+        // Show loading state
+        document.getElementById('app').innerHTML = `
+            <div style="text-align: center; margin-top: 100px;">
+                <h2>Loading Stream Bingo...</h2>
+                <p>Please wait while the application initializes.</p>
+            </div>
+        `;
         
-        // Check if we need to show the dashboard after auth callback
-        if (window.showDashboardAfterLoad) {
-            console.log('Showing dashboard after auth callback');
-            app.showDashboard();
-            window.showDashboardAfterLoad = false;
+        // Check for hash in URL (this might be a Twitch redirect)
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token=')) {
+            console.log('Found access token in URL hash, likely a Twitch redirect');
         }
-    }, 100);
+        
+        const app = new StreamBingo();
+        window.streamBingo = app;
+        
+        // Small delay to ensure Firebase and auth managers are initialized
+        setTimeout(() => {
+            try {
+                app.init();
+                
+                // Check if we need to show the dashboard after auth callback
+                if (window.showDashboardAfterLoad) {
+                    console.log('Showing dashboard after auth callback');
+                    app.showDashboard();
+                    window.showDashboardAfterLoad = false;
+                }
+            } catch (err) {
+                console.error('Error during app initialization:', err);
+                document.getElementById('app').innerHTML = `
+                    <div style="text-align: center; margin-top: 100px;">
+                        <h2>Initialization Error</h2>
+                        <p>There was a problem loading the application.</p>
+                        <p style="color: #ff6b6b;">Error: ${err.message || 'Unknown error'}</p>
+                        <button onclick="window.location.reload()" class="btn btn-primary" style="margin-top: 20px;">Reload App</button>
+                    </div>
+                `;
+            }
+        }, 100);
+    } catch (err) {
+        console.error('Critical error during app startup:', err);
+        document.getElementById('app').innerHTML = `
+            <div style="text-align: center; margin-top: 100px;">
+                <h2>Application Error</h2>
+                <p>There was a critical problem starting the application.</p>
+                <p style="color: #ff6b6b;">Error: ${err.message || 'Unknown error'}</p>
+                <button onclick="window.location.reload()" style="padding: 10px 20px; background: #ff4081; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Reload App</button>
+            </div>
+        `;
+    }
 });
 
 
@@ -34,6 +72,10 @@ class StreamBingo {
             if (this.debug) console.log('[StreamBingo]', ...args);
         };
         this.auth = window.authManager || null;
+        
+        if (!this.auth) {
+            console.error('Auth manager not initialized! This might cause login issues.');
+        }
     }
 
     init() {
@@ -55,6 +97,7 @@ class StreamBingo {
     }
 
     showLoginScreen() {
+        console.log('Displaying login screen');
         this.app.innerHTML = `
         <div class="container">
             <h1 class="title">Stream Bingo</h1>
@@ -82,6 +125,8 @@ class StreamBingo {
                     Login for Testing
                 </button>
             </div>
+            
+            <div id="loginStatus" style="margin-top: 20px; color: #ccc;"></div>
         </div>
     `;
 
@@ -135,7 +180,13 @@ class StreamBingo {
 
         // Add event listeners
         document.getElementById('twitchLogin').addEventListener('click', () => {
-            if (this.auth) this.auth.loginWithTwitch();
+            if (this.auth) {
+                document.getElementById('loginStatus').textContent = 'Redirecting to Twitch for authentication...';
+                this.auth.loginWithTwitch();
+            } else {
+                this.showNotification('Authentication service not available');
+                document.getElementById('loginStatus').textContent = 'Error: Authentication service not available';
+            }
         });
 
         document.getElementById('testLogin').addEventListener('click', () => {
