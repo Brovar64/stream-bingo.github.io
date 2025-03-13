@@ -306,7 +306,7 @@ class StreamBingo {
             `;
             }
 
-            // Generate the full admin UI
+            // Generate the full admin UI - with sort controls already in the players list
             this.app.innerHTML = `
             <div class="container">
                 <h1 class="title">Admin Dashboard</h1>
@@ -324,6 +324,11 @@ class StreamBingo {
                         <div class="admin-sidebar">
                             <h4 style="margin-bottom: 1rem;">Players List</h4>
                             <ul id="playersList" class="player-list">
+                                <div class="sort-controls">
+                                    <span>Sort by:</span>
+                                    <button id="sortByName" class="btn-sort">Name</button>
+                                    <button id="sortByScore" class="btn-sort active">Score</button>
+                                </div>
                                 <li>Loading players...</li>
                             </ul>
                         </div>
@@ -338,48 +343,44 @@ class StreamBingo {
             </div>
         `;
 
-            // Add CSS for the new elements
+            // Add CSS for the bingo words grid if needed
             const style = document.createElement('style');
             style.textContent = `
-            .bingo-words-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 10px;
-            }
-            
-            .bingo-word {
-                background-color: #2D2D2D;
-                border-radius: 8px;
-                padding: 12px;
+            /* Add this to your existing CSS */
+            .bingo-cell.pending {
+                background-color: #FFA000;
                 position: relative;
             }
             
-            .approved-indicator {
+            .bingo-cell.pending:after {
+                content: 'Pending approval';
                 position: absolute;
-                top: 8px;
-                right: 8px;
-                font-size: 16px;
-                font-weight: bold;
+                bottom: 5px;
+                left: 0;
+                right: 0;
+                font-size: 0.65rem;
+                font-weight: normal;
+                opacity: 0.9;
             }
             
-            .player-indicators {
+            .bingo-cell {
                 display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-                margin-top: 8px;
+                flex-direction: column;
+                justify-content: center;
+                position: relative;
+                min-height: 80px;
             }
             
-            .player-icon {
-                width: 24px;
-                height: 24px;
+            .bingo-cell.marked {
                 background-color: #FF4081;
                 color: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: bold;
-                font-size: 12px;
+            }
+            
+            /* Updated styles for bingo words */
+            .bingo-words-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 10px;
             }
         `;
             document.head.appendChild(style);
@@ -396,25 +397,34 @@ class StreamBingo {
                 document.getElementById('saveWords').addEventListener('click', () => this.saveWords());
             }
 
+            // Add event listeners for sort buttons AFTER the DOM is created
+            document.getElementById('sortByName').addEventListener('click', () => {
+                this.sortPlayers('name');
+            });
+
+            document.getElementById('sortByScore').addEventListener('click', () => {
+                this.sortPlayers('score');
+            });
+
             document.getElementById('leaveRoom').addEventListener('click', () => this.leaveRoom());
 
-            // Load players list
-            this.loadPlayersList();
-
-            // Set up real-time updates
+            // Set up real-time listeners after DOM is ready
             setTimeout(() => {
                 this.setupRoomListener();
                 this.setupPlayersListener();
+                this.checkInactiveRooms(); // Check for inactive rooms
             }, 100);
+
         } catch (error) {
             console.error('Error showing admin dashboard:', error);
             this.showNotification('Error loading admin dashboard');
         }
-        this.updateRoomActivity();
     }
 
     sortPlayers(sortBy) {
         const playersList = document.getElementById('playersList');
+        if (!playersList) return;
+
         const sortButtons = document.querySelectorAll('.btn-sort');
 
         // Update active button
@@ -429,7 +439,11 @@ class StreamBingo {
         }
 
         // Get all player items (skip the sort controls)
+        const sortControls = playersList.querySelector('.sort-controls');
         const playerItems = Array.from(document.querySelectorAll('.player-item'));
+
+        // Skip if we don't have players yet
+        if (playerItems.length === 0 || !sortControls) return;
 
         // Sort players
         playerItems.sort((a, b) => {
@@ -458,13 +472,22 @@ class StreamBingo {
         });
 
         // Save the sort controls
-        const sortControls = playersList.querySelector('.sort-controls');
+        const tempControls = sortControls.cloneNode(true);
 
         // Clear the list
         playersList.innerHTML = '';
 
         // Add back the sort controls
-        playersList.appendChild(sortControls);
+        playersList.appendChild(tempControls);
+
+        // Restore sort button event listeners
+        playersList.querySelector('#sortByName').addEventListener('click', () => {
+            this.sortPlayers('name');
+        });
+
+        playersList.querySelector('#sortByScore').addEventListener('click', () => {
+            this.sortPlayers('score');
+        });
 
         // Add sorted players
         playerItems.forEach(item => {
@@ -612,98 +635,115 @@ class StreamBingo {
             });
     }
 
-    setupPlayerListener() {
-        this.log('Setting up player listener');
+    setupPlayersListener() {
+        console.log('Setting up players listener for real-time updates');
 
-        // Listen for changes to the room document (for approved words)
-        if (this.roomUnsubscribe) {
-            this.roomUnsubscribe();
+        // Clean up existing listener if any
+        if (this.playersUnsubscribe) {
+            this.playersUnsubscribe();
         }
 
-        // First get the player data to get the bingoGrid
-        const playerRef = db.collection('rooms').doc(this.currentRoom)
-            .collection('players').doc(this.currentUser.nickname);
+        // We'll use a separate listener to track all players at once
+        this.playersUnsubscribe = db.collection('rooms').doc(this.currentRoom)
+            .collection('players')
+            .onSnapshot(snapshot => {
+                // Process changes in player data
+                snapshot.docChanges().forEach(async change => {
+                    const playerId = change.doc.id;
+                    const playerData = change.doc.data();
 
-        playerRef.get().then(playerDoc => {
-            if (playerDoc.exists) {
-                const playerData = playerDoc.data();
-                this.bingoGrid = playerData.bingoGrid || [];
+                    // Skip processing if we don't have a player list yet
+                    const playersList = document.getElementById('playersList');
+                    if (!playersList) return;
 
-                // Now listen for room changes
-                this.roomUnsubscribe = db.collection('rooms').doc(this.currentRoom)
-                    .onSnapshot(roomDoc => {
-                        if (roomDoc.exists) {
-                            const roomData = roomDoc.data();
-                            const approvedWords = roomData.approvedWords || [];
-                            const pendingWords = roomData.pendingWords || {};
+                    // Get the approved words to calculate scores
+                    const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
+                    const roomData = roomDoc.data();
+                    const approvedWords = roomData.approvedWords || [];
 
-                            // Update player's grid based on approved words
-                            const cells = document.querySelectorAll('.bingo-cell');
+                    // Calculate player's score
+                    const bingoGrid = playerData.bingoGrid || [];
+                    const markedCells = [];
 
-                            cells.forEach(cell => {
-                                const index = parseInt(cell.dataset.index);
-                                const word = this.bingoGrid[index];
-                                const wordIndex = roomData.words.indexOf(word);
-
-                                // Reset cell state
-                                cell.classList.remove('marked', 'pending');
-                                cell.innerHTML = word;
-
-                                // Mark as approved if word is approved
-                                if (approvedWords.includes(wordIndex)) {
-                                    cell.classList.add('marked');
-                                }
-                                // Mark as pending if this player has requested it
-                                else if (
-                                    pendingWords[wordIndex] &&
-                                    pendingWords[wordIndex].includes(this.currentUser.nickname)
-                                ) {
-                                    cell.classList.add('pending');
-                                    cell.innerHTML = word +
-                                        '<div style="font-size: 0.8em; margin-top: 5px;">Pending approval</div>';
-                                }
-                            });
-
-                            // Update markedCells for bingo checking
-                            const markedCells = [];
-                            cells.forEach((cell, index) => {
-                                if (cell.classList.contains('marked')) {
-                                    markedCells.push(index);
-                                }
-                            });
-
-                            // Check for bingo
-                            const hasBingo = this.checkBingo(markedCells, this.bingoSize);
-
-                            // Update bingo notification
-                            const bingoContainer = document.querySelector('.container');
-                            let bingoNotification = document.querySelector('.container > div:nth-child(3)');
-
-                            if (bingoNotification && !bingoNotification.textContent.includes('BINGO')) {
-                                bingoNotification = null;
-                            }
-
-                            if (hasBingo && !bingoNotification) {
-                                const notificationDiv = document.createElement('div');
-                                notificationDiv.style.backgroundColor = '#FF4081';
-                                notificationDiv.style.color = 'white';
-                                notificationDiv.style.padding = '1rem';
-                                notificationDiv.style.borderRadius = '8px';
-                                notificationDiv.style.marginBottom = '1rem';
-
-                                notificationDiv.innerHTML = `<h2 style="margin: 0;">BINGO! 🎉</h2>`;
-
-                                const gridElement = document.querySelector('.bingo-grid');
-                                bingoContainer.insertBefore(notificationDiv, gridElement);
-                            } else if (!hasBingo && bingoNotification) {
-                                bingoNotification.remove();
-                            }
+                    // Calculate marked cells based on approved words
+                    bingoGrid.forEach((word, index) => {
+                        const wordIndex = this.bingoWords.indexOf(word);
+                        if (approvedWords.includes(wordIndex)) {
+                            markedCells.push(index);
                         }
                     });
-            }
-        }).catch(error => {
-            console.error('Error setting up player listener:', error);
-        });
+
+                    // Check if player has bingo
+                    const hasBingo = this.checkBingo(markedCells, this.bingoSize);
+
+                    // Update or add player in the list
+                    if (change.type === 'added' || change.type === 'modified') {
+                        let playerItem = document.querySelector(`.player-item[data-player-id="${playerId}"]`);
+
+                        // If player doesn't exist in list yet, create it
+                        if (!playerItem && change.type === 'added') {
+                            playerItem = document.createElement('li');
+                            playerItem.className = 'player-item';
+                            playerItem.dataset.playerId = playerId;
+
+                            playerItem.addEventListener('click', (e) => {
+                                // Skip if the delete button was clicked
+                                if (e.target.classList.contains('delete-player')) return;
+
+                                this.showPlayerBingoCard(playerId);
+
+                                // Set active class
+                                document.querySelectorAll('.player-item').forEach(i => {
+                                    i.classList.remove('active');
+                                });
+                                playerItem.classList.add('active');
+                            });
+
+                            // Add to list
+                            playersList.appendChild(playerItem);
+                        }
+
+                        // Update the player item content if it exists
+                        if (playerItem) {
+                            const score = hasBingo ?
+                                `<span class="score bingo">BINGO! 🎉</span>` :
+                                `<span class="score">${markedCells.length}/${bingoGrid.length}</span>`;
+
+                            playerItem.innerHTML = `
+                            <div class="player-info">
+                                <span class="player-name">${playerId}</span>
+                                ${score}
+                            </div>
+                            <button class="delete-player" title="Remove player">✕</button>
+                        `;
+
+                            // Add delete button event listener
+                            const deleteBtn = playerItem.querySelector('.delete-player');
+                            if (deleteBtn) {
+                                deleteBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation(); // Prevent player selection
+                                    this.deletePlayer(playerId);
+                                });
+                            }
+                        }
+
+                        // Refresh sort order after updating
+                        this.sortPlayers(document.getElementById('sortByScore').classList.contains('active') ? 'score' : 'name');
+                    }
+                    else if (change.type === 'removed') {
+                        // Remove player from list
+                        const playerItem = document.querySelector(`.player-item[data-player-id="${playerId}"]`);
+                        if (playerItem) {
+                            playerItem.remove();
+                        }
+                    }
+
+                    // Also update selected player card if this is the selected player
+                    if (this.selectedPlayer === playerId) {
+                        this.showPlayerBingoCard(playerId);
+                    }
+                });
+            });
     }
 
     log(...args) {
