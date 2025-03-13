@@ -16,36 +16,225 @@ class StreamBingo {
         this.bingoWords = [];
         this.bingoGrid = [];
         this.bingoSize = 3; // Default grid size
-
-        // Add debug logging
         this.debug = true;
+        this.log = (...args) => {
+            if (this.debug) console.log('[StreamBingo]', ...args);
+        };
+        this.auth = window.authManager || null;
     }
 
     init() {
-        // Check if user is in session storage
-        const savedUser = sessionStorage.getItem('streamBingoUser');
-        if (savedUser) {
-            this.currentUser = JSON.parse(savedUser);
-            
-            // Check if room exists
-            this.checkRoomExists(this.currentUser.roomCode)
-                .then(exists => {
-                    if (exists) {
-                        this.currentRoom = this.currentUser.roomCode;
-                        if (this.currentUser.isAdmin) {
-                            this.isAdmin = true;
-                            this.showAdminDashboard();
-                        } else {
-                            this.showPlayerGame();
-                        }
-                    } else {
-                        sessionStorage.removeItem('streamBingoUser');
-                        this.showWelcomeScreen();
-                    }
-                });
+        // Check if user is logged in
+        if (this.auth && this.auth.isLoggedIn()) {
+            this.showDashboard();
         } else {
-            this.showWelcomeScreen();
+            this.showLoginScreen();
         }
+    }
+
+    showLoginScreen() {
+        this.app.innerHTML = `
+        <div class="container">
+            <h1 class="title">Stream Bingo</h1>
+            <p class="subtitle">Create and play bingo during streams!</p>
+            
+            <div class="login-box">
+                <button id="twitchLogin" class="btn btn-twitch">
+                    <img src="img/twitch-icon.png" alt="Twitch" style="width: 24px; margin-right: 8px;"> 
+                    Login with Twitch
+                </button>
+                
+                <div class="separator">
+                    <span>or</span>
+                </div>
+                
+                <div class="form-group">
+                    <input type="text" id="testUsername" class="form-control" placeholder="Enter test username">
+                </div>
+                
+                <button id="testLogin" class="btn btn-secondary">
+                    Login for Testing
+                </button>
+            </div>
+        </div>
+    `;
+
+        // Add styles for new elements
+        const style = document.createElement('style');
+        style.textContent = `
+        .login-box {
+            background-color: #1E1E1E;
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .btn-twitch {
+            background-color: #9146FF;
+            color: white;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn-twitch:hover {
+            background-color: #7D2DF8;
+        }
+        
+        .separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.5rem 0;
+            color: #888;
+        }
+        
+        .separator::before,
+        .separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #444;
+        }
+        
+        .separator span {
+            padding: 0 10px;
+        }
+    `;
+        document.head.appendChild(style);
+
+        // Add event listeners
+        document.getElementById('twitchLogin').addEventListener('click', () => {
+            if (this.auth) this.auth.loginWithTwitch();
+        });
+
+        document.getElementById('testLogin').addEventListener('click', () => {
+            const username = document.getElementById('testUsername').value.trim();
+            if (username) {
+                if (this.auth) this.auth.loginWithTestAccount(username);
+                this.showDashboard();
+            } else {
+                this.showNotification('Please enter a username');
+            }
+        });
+    }
+
+    showDashboard() {
+        const username = this.auth ? this.auth.getUsername() : 'User';
+        const profileImage = this.auth && this.auth.getProfileImage();
+
+        this.app.innerHTML = `
+        <div class="container">
+            <header class="dashboard-header">
+                <h1 class="title">Stream Bingo</h1>
+                
+                <div class="user-profile">
+                    ${profileImage ? `<img src="${profileImage}" alt="${username}" class="profile-image">` : ''}
+                    <span class="username">${username}</span>
+                    <button id="logoutBtn" class="btn btn-small">Logout</button>
+                </div>
+            </header>
+            
+            <div class="dashboard-options">
+                <div class="option-card">
+                    <h2>Create Room</h2>
+                    <p>Create a new bingo room for your stream</p>
+                    <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
+                </div>
+                
+                <div class="option-card">
+                    <h2>Join Room</h2>
+                    <p>Join an existing bingo room</p>
+                    <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
+                </div>
+                
+                <div class="option-card">
+                    <h2>My Bingo Lists</h2>
+                    <p>Manage your saved bingo word lists</p>
+                    <button id="bingoListsBtn" class="btn btn-primary">Manage Lists</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+        // Add styles for dashboard
+        const style = document.createElement('style');
+        style.textContent = `
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .profile-image {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+        
+        .username {
+            font-weight: 500;
+            color: #FFF;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+        
+        .dashboard-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .option-card {
+            background-color: #1E1E1E;
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .option-card h2 {
+            margin-bottom: 0.75rem;
+            color: #FF4081;
+        }
+        
+        .option-card p {
+            color: #B0BEC5;
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
+        }
+    `;
+        document.head.appendChild(style);
+
+        // Add event listeners
+        document.getElementById('createRoomBtn').addEventListener('click', () => this.showCreateRoomScreen());
+        document.getElementById('joinRoomBtn').addEventListener('click', () => this.showJoinRoomScreen());
+        document.getElementById('bingoListsBtn').addEventListener('click', () => this.showBingoListsScreen());
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            if (this.auth) this.auth.logout();
+            this.showLoginScreen();
+        });
+    }
+
+// Add a new screen for managing bingo lists
+    showBingoListsScreen() {
+        // We'll add this part next if you like this approach
     }
 
     async checkRoomExists(roomCode) {
