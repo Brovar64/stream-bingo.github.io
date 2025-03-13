@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Bingo - Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #121212;
+            color: #f0f0f0;
+        }
+        h1 {
+            color: #FF4081;
+        }
+        .card {
+            background: #1E1E1E;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #9146FF;
+        }
+        pre {
+            background: #333;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #FF4081;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #e0356f;
+        }
+        .action-bar {
+            margin: 20px 0;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+        }
+    </style>
+</head>
+<body>
+    <h1>Stream Bingo - Debug Tool</h1>
+    <p>This page helps diagnose Twitch authentication issues in your Stream Bingo app.</p>
+    
+    <div class="action-bar">
+        <button id="checkLocalStorage">Check Local Storage</button>
+        <button id="clearLocalStorage">Clear Local Storage</button>
+        <button id="checkUrlParams">Check URL Parameters</button>
+        <button id="checkRedirectUri">Test Redirect URI</button>
+        <button id="goToApp">Go to App</button>
+    </div>
+    
+    <div class="card">
+        <h2>Environment Info</h2>
+        <div id="environmentInfo"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Local Storage</h2>
+        <div id="localStorageContent"></div>
+    </div>
+    
+    <div class="card">
+        <h2>URL Parameters</h2>
+        <div id="urlParameters"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Twitch Authentication Test</h2>
+        <div id="twitchAuthTest"></div>
+    </div>
+    
+    <script>
+        // Environment Info
+        function updateEnvironmentInfo() {
+            const envInfo = document.getElementById('environmentInfo');
+            
+            const info = {
+                'User Agent': navigator.userAgent,
+                'URL': window.location.href,
+                'Host': window.location.hostname,
+                'Path': window.location.pathname,
+                'Protocol': window.location.protocol,
+                'Port': window.location.port || '(default)',
+                'Referrer': document.referrer || '(none)'
+            };
+            
+            let html = '<pre>';
+            for (const [key, value] of Object.entries(info)) {
+                html += `${key}: ${value}\n`;
+            }
+            html += '</pre>';
+            
+            envInfo.innerHTML = html;
+        }
+        
+        // Check Local Storage
+        document.getElementById('checkLocalStorage').addEventListener('click', function() {
+            const storageDiv = document.getElementById('localStorageContent');
+            
+            try {
+                const streamBingoUser = localStorage.getItem('streamBingoUser');
+                
+                if (streamBingoUser) {
+                    const userData = JSON.parse(streamBingoUser);
+                    
+                    storageDiv.innerHTML = `
+                        <p class="success">User found in local storage!</p>
+                        <pre>${JSON.stringify(userData, null, 2)}</pre>
+                        <p>Authentication provider: <strong>${userData.provider || 'unknown'}</strong></p>
+                        <p>Username: <strong>${userData.username || 'unknown'}</strong></p>
+                    `;
+                } else {
+                    storageDiv.innerHTML = `
+                        <p class="error">No user found in local storage.</p>
+                        <p>This means you're not logged in or the authentication data was cleared.</p>
+                    `;
+                }
+            } catch (err) {
+                storageDiv.innerHTML = `
+                    <p class="error">Error reading from local storage: ${err.message}</p>
+                `;
+            }
+        });
+        
+        // Clear Local Storage
+        document.getElementById('clearLocalStorage').addEventListener('click', function() {
+            const storageDiv = document.getElementById('localStorageContent');
+            
+            try {
+                localStorage.removeItem('streamBingoUser');
+                storageDiv.innerHTML = `
+                    <p class="success">Local storage cleared successfully!</p>
+                    <p>You will need to log in again when you return to the app.</p>
+                `;
+            } catch (err) {
+                storageDiv.innerHTML = `
+                    <p class="error">Error clearing local storage: ${err.message}</p>
+                `;
+            }
+        });
+        
+        // Check URL Parameters
+        document.getElementById('checkUrlParams').addEventListener('click', function() {
+            const paramsDiv = document.getElementById('urlParameters');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const hash = window.location.hash.substring(1);
+            const hashParams = new URLSearchParams(hash);
+            
+            let html = '<h3>Query Parameters</h3>';
+            
+            if (urlParams.toString()) {
+                html += '<pre>';
+                for (const [key, value] of urlParams.entries()) {
+                    html += `${key}: ${value}\n`;
+                }
+                html += '</pre>';
+            } else {
+                html += '<p>No query parameters found.</p>';
+            }
+            
+            html += '<h3>Hash Parameters</h3>';
+            
+            if (hash) {
+                html += '<pre>';
+                for (const [key, value] of hashParams.entries()) {
+                    html += `${key}: ${value}\n`;
+                }
+                html += '</pre>';
+                
+                if (hashParams.get('access_token')) {
+                    html += `<p class="success">Found Twitch access token: ${hashParams.get('access_token').substring(0, 10)}...</p>`;
+                }
+            } else {
+                html += '<p>No hash parameters found.</p>';
+            }
+            
+            paramsDiv.innerHTML = html;
+        });
+        
+        // Test Redirect URI
+        document.getElementById('checkRedirectUri').addEventListener('click', function() {
+            const authTestDiv = document.getElementById('twitchAuthTest');
+            
+            // Determine the expected redirect URI based on the current hostname
+            const hostname = window.location.hostname;
+            let expectedRedirectUri = '';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                expectedRedirectUri = 'http://localhost:8080/index.html';
+            } else {
+                expectedRedirectUri = 'https://brovar64.github.io/stream-bingo/index.html';
+            }
+            
+            authTestDiv.innerHTML = `
+                <p>Current hostname: <strong>${hostname}</strong></p>
+                <p>Expected redirect URI in Twitch dashboard: <strong>${expectedRedirectUri}</strong></p>
+                <p>Make sure this matches exactly what you have configured in your Twitch Developer Console.</p>
+                <p>Redirect URI is case-sensitive and must match the URL exactly, including http/https.</p>
+                
+                <h3>Test Twitch Auth Flow</h3>
+                <p>Click the button below to test the Twitch authentication flow:</p>
+                <button id="testTwitchAuth" style="background: #9146FF;">Test Twitch Auth</button>
+            `;
+            
+            // Add event listener for test button
+            document.getElementById('testTwitchAuth').addEventListener('click', function() {
+                const clientId = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+                const redirectUri = encodeURIComponent(expectedRedirectUri);
+                const scopes = 'user:read:email';
+                
+                window.location.href = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scopes}`;
+            });
+        });
+        
+        // Go to App
+        document.getElementById('goToApp').addEventListener('click', function() {
+            window.location.href = 'index.html';
+        });
+        
+        // Initialize the page
+        updateEnvironmentInfo();
+    </script>
+</body>
+</html>
