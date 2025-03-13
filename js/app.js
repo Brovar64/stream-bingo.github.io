@@ -62,7 +62,11 @@ class StreamBingo {
             
             <div class="login-box">
                 <button id="twitchLogin" class="btn btn-twitch">
-                    <img src="./img/twitch.png" alt="Twitch" style="width: 24px; margin-right: 8px;"> 
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                        <path d="M11.6461 4.50039H13.9461V9.10039H11.6461V4.50039Z" fill="white"/>
+                        <path d="M7.54614 4.50039H9.84614V9.10039H7.54614V4.50039Z" fill="white"/>
+                        <path d="M4.09238 1.20001L2.09238 5.20001V18.8H6.89238V22H9.69238L12.8924 18.8H16.9924L21.8924 13.9V1.20001H4.09238ZM19.9924 13L16.6924 16.3H11.6924L8.59238 19.4V16.3H4.49238V3.20001H19.9924V13Z" fill="white"/>
+                    </svg>
                     Login with Twitch
                 </button>
                 
