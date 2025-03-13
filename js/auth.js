@@ -3,7 +3,13 @@ class AuthManager {
     constructor() {
         this.currentUser = null;
         this.TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
-        this.REDIRECT_URI = 'http://localhost:8080/index.html';
+        // Make sure this exactly matches one of your configured redirect URLs
+        this.REDIRECT_URI = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:8080/index.html'
+            : 'https://brovar64.github.io/stream-bingo/index.html';
+        
+        console.log('Auth Manager initialized with redirect URI:', this.REDIRECT_URI);
+        
         // Check for existing login
         const isHandlingCallback = this.checkForAuthCallback();
 
@@ -16,8 +22,14 @@ class AuthManager {
     loadUserFromStorage() {
         const userData = localStorage.getItem('streamBingoUser');
         if (userData) {
-            this.currentUser = JSON.parse(userData);
-            return true;
+            try {
+                this.currentUser = JSON.parse(userData);
+                console.log('User loaded from storage:', this.currentUser.username);
+                return true;
+            } catch (e) {
+                console.error('Error parsing user data from storage:', e);
+                return false;
+            }
         }
         return false;
     }
@@ -25,11 +37,13 @@ class AuthManager {
     saveUserToStorage(user) {
         localStorage.setItem('streamBingoUser', JSON.stringify(user));
         this.currentUser = user;
+        console.log('User saved to storage:', user.username);
     }
 
     clearUserFromStorage() {
         localStorage.removeItem('streamBingoUser');
         this.currentUser = null;
+        console.log('User cleared from storage');
     }
 
     isLoggedIn() {
@@ -50,8 +64,11 @@ class AuthManager {
 
     // Initiate Twitch login
     loginWithTwitch() {
+        console.log('Initiating Twitch login...');
         const scopes = 'user:read:email';
-        window.location.href = `https://id.twitch.tv/oauth2/authorize?client_id=${this.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&response_type=token&scope=${scopes}`;
+        const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${this.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&response_type=token&scope=${scopes}`;
+        console.log('Redirecting to:', authUrl);
+        window.location.href = authUrl;
     }
 
     checkForAuthCallback() {
@@ -84,6 +101,7 @@ class AuthManager {
                         // Ensure streamBingo is initialized properly
                         if (window.streamBingo) {
                             // Force a dashboard display after authentication
+                            console.log('Showing dashboard via streamBingo object');
                             if (window.streamBingo.showDashboard) {
                                 window.streamBingo.showDashboard();
                             } else {
@@ -91,6 +109,7 @@ class AuthManager {
                             }
                         } else {
                             // If streamBingo object isn't available yet, create a flag to show dashboard
+                            console.log('Setting flag to show dashboard after load');
                             window.showDashboardAfterLoad = true;
                             // Reload as fallback
                             window.location.reload();
@@ -102,6 +121,7 @@ class AuthManager {
                         <div style="text-align: center; margin-top: 100px;">
                             <h2>Authentication Error</h2>
                             <p>There was a problem logging in with Twitch.</p>
+                            <p>Error details: ${error.message || 'Unknown error'}</p>
                             <button onclick="window.location.reload()">Try Again</button>
                         </div>
                     `;
