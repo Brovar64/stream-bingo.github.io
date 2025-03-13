@@ -1,6 +1,7 @@
 // Stream Bingo App
 document.addEventListener('DOMContentLoaded', () => {
     const app = new StreamBingo();
+    window.streamBingo = app;
     app.init();
 });
 
