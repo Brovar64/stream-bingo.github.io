@@ -11,3 +11,6 @@ yarn-error.log*
 .idea/
 .vscode/
 *.iml
+
+# Firebase config file with real credentials
+firebase-config.json
