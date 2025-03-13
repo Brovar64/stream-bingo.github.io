@@ -1,16 +1,42 @@
-// Firebase Configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU",
-  authDomain: "stream-bingo-ecb40.firebaseapp.com",
-  projectId: "stream-bingo-ecb40",
-  storageBucket: "stream-bingo-ecb40.firebasestorage.app",
-  messagingSenderId: "814141306111",
-  appId: "1:814141306111:web:319ac02de11210186408ca",
-  measurementId: "G-1DYM2MTE10"
-};
+// Secure Firebase Configuration Loader
+async function initializeFirebase() {
+    try {
+        // Try to load configuration from external file (for local development)
+        const configResponse = await fetch('./firebase-config.json');
+        
+        // If config file exists, use it
+        if (configResponse.ok) {
+            const firebaseConfig = await configResponse.json();
+            initializeWithConfig(firebaseConfig);
+            console.log('Firebase initialized from config file');
+            return;
+        }
+    } catch (error) {
+        console.log('No local config file found, using environment config');
+    }
+    
+    // Fallback to environment config for production
+    // These will be replaced during the build process
+    const firebaseConfig = {
+        apiKey: "FIREBASE_API_KEY",
+        authDomain: "FIREBASE_AUTH_DOMAIN",
+        projectId: "FIREBASE_PROJECT_ID",
+        storageBucket: "FIREBASE_STORAGE_BUCKET",
+        messagingSenderId: "FIREBASE_MESSAGING_SENDER_ID",
+        appId: "FIREBASE_APP_ID",
+        measurementId: "FIREBASE_MEASUREMENT_ID"
+    };
+    
+    initializeWithConfig(firebaseConfig);
+}
 
-// Initialize Firebase with compat version
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
-const analytics = firebase.analytics();
+function initializeWithConfig(firebaseConfig) {
+    // Initialize Firebase with the config
+    firebase.initializeApp(firebaseConfig);
+    window.db = firebase.firestore();
+    window.auth = firebase.auth();
+    window.analytics = firebase.analytics();
+}
+
+// Initialize Firebase when the script loads
+initializeFirebase();
