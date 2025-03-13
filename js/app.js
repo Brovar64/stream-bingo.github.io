@@ -40,7 +40,7 @@ class StreamBingo {
             
             <div class="login-box">
                 <button id="twitchLogin" class="btn btn-twitch">
-                    <img src="img/twitch-icon.png" alt="Twitch" style="width: 24px; margin-right: 8px;"> 
+                    <img src="./js/img/twitch.png" alt="Twitch" style="width: 24px; margin-right: 8px;"> 
                     Login with Twitch
                 </button>
                 
