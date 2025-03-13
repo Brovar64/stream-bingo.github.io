@@ -171,9 +171,10 @@ class StreamBingo {
                 adminId: nickname,
                 gridSize: gridSize,
                 words: [],
-                approvedWords: [],  // New: tracks approved word indexes
-                pendingWords: {},   // New: maps word indexes to arrays of player names
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                approvedWords: [],
+                pendingWords: {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastActive: firebase.firestore.FieldValue.serverTimestamp() // Add this line
             });
 
             // Save user to session
@@ -245,6 +246,7 @@ class StreamBingo {
             console.error('Error joining room:', error);
             this.showNotification('Error joining room. Please try again.');
         }
+        this.updateRoomActivity();
     }
 
     async showAdminDashboard() {
@@ -350,17 +352,6 @@ class StreamBingo {
                 border-radius: 8px;
                 padding: 12px;
                 position: relative;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            
-            .bingo-word:hover {
-                background-color: #3A3A3A;
-            }
-            
-            .bingo-word.approved {
-                background-color: #4CAF50;
-                color: white;
             }
             
             .approved-indicator {
@@ -419,8 +410,122 @@ class StreamBingo {
             console.error('Error showing admin dashboard:', error);
             this.showNotification('Error loading admin dashboard');
         }
+        this.updateRoomActivity();
     }
 
+    sortPlayers(sortBy) {
+        const playersList = document.getElementById('playersList');
+        const sortButtons = document.querySelectorAll('.btn-sort');
+
+        // Update active button
+        sortButtons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        if (sortBy === 'name') {
+            document.getElementById('sortByName').classList.add('active');
+        } else {
+            document.getElementById('sortByScore').classList.add('active');
+        }
+
+        // Get all player items (skip the sort controls)
+        const playerItems = Array.from(document.querySelectorAll('.player-item'));
+
+        // Sort players
+        playerItems.sort((a, b) => {
+            if (sortBy === 'name') {
+                return a.querySelector('.player-name').textContent.localeCompare(
+                    b.querySelector('.player-name').textContent
+                );
+            } else {
+                // Sort by bingo first
+                const aHasBingo = a.querySelector('.score.bingo') !== null;
+                const bHasBingo = b.querySelector('.score.bingo') !== null;
+
+                if (aHasBingo && !bHasBingo) return -1;
+                if (!aHasBingo && bHasBingo) return 1;
+
+                // Then by score
+                if (!aHasBingo && !bHasBingo) {
+                    const aScore = a.querySelector('.score').textContent.split('/');
+                    const bScore = b.querySelector('.score').textContent.split('/');
+
+                    return parseInt(bScore[0]) - parseInt(aScore[0]);
+                }
+
+                return 0;
+            }
+        });
+
+        // Save the sort controls
+        const sortControls = playersList.querySelector('.sort-controls');
+
+        // Clear the list
+        playersList.innerHTML = '';
+
+        // Add back the sort controls
+        playersList.appendChild(sortControls);
+
+        // Add sorted players
+        playerItems.forEach(item => {
+            playersList.appendChild(item);
+        });
+    }
+
+    async deletePlayer(playerId) {
+        if (!confirm(`Are you sure you want to remove player "${playerId}"?`)) {
+            return;
+        }
+
+        try {
+            // Delete player document
+            await db.collection('rooms').doc(this.currentRoom)
+                .collection('players').doc(playerId).delete();
+
+            // Clean up pending words requests from this player
+            const roomRef = db.collection('rooms').doc(this.currentRoom);
+            const roomDoc = await roomRef.get();
+            const roomData = roomDoc.data();
+
+            let pendingWords = roomData.pendingWords || {};
+            let hasChanges = false;
+
+            // Remove player from all pending word requests
+            Object.keys(pendingWords).forEach(wordIndex => {
+                const players = pendingWords[wordIndex];
+                const updatedPlayers = players.filter(player => player !== playerId);
+
+                if (updatedPlayers.length !== players.length) {
+                    pendingWords[wordIndex] = updatedPlayers;
+                    hasChanges = true;
+                }
+
+                // Remove empty arrays
+                if (pendingWords[wordIndex].length === 0) {
+                    delete pendingWords[wordIndex];
+                }
+            });
+
+            if (hasChanges) {
+                await roomRef.update({ pendingWords });
+            }
+
+            // If this was the selected player, clear the view
+            if (this.selectedPlayer === playerId) {
+                this.selectedPlayer = null;
+                document.getElementById('selectedPlayerView').innerHTML =
+                    '<p>Select a player to view their bingo card</p>';
+            }
+
+            this.showNotification(`Player "${playerId}" removed`);
+
+            // Refresh the player list
+            this.loadPlayersList();
+        } catch (error) {
+            console.error('Error deleting player:', error);
+            this.showNotification('Error removing player');
+        }
+    }
 
     setupRoomListener() {
         console.log('Setting up room listener for real-time updates');
@@ -507,7 +612,6 @@ class StreamBingo {
             });
     }
 
-    // Add this method if it's missing
     setupPlayerListener() {
         this.log('Setting up player listener');
 
@@ -602,53 +706,197 @@ class StreamBingo {
         });
     }
 
-// Add/update the log method if needed
     log(...args) {
         if (this.debug) console.log('[StreamBingo]', ...args);
     }
 
-// Make sure constructor includes debug flag
+    checkInactiveRooms() {
+        console.log("Checking for inactive rooms...");
 
+        const threeHoursAgo = new Date();
+        threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
+
+        db.collection('rooms')
+            .where('lastActive', '<', threeHoursAgo)
+            .limit(5) // Process a few at a time
+            .get()
+            .then(snapshot => {
+                if (snapshot.empty) {
+                    console.log("No inactive rooms found");
+                    return;
+                }
+
+                console.log(`Found ${snapshot.size} inactive rooms to clean up`);
+
+                snapshot.forEach(async (doc) => {
+                    const roomId = doc.id;
+
+                    // Skip if it's the current room
+                    if (roomId === this.currentRoom) return;
+
+                    try {
+                        // Get all players
+                        const playersSnapshot = await db.collection('rooms')
+                            .doc(roomId)
+                            .collection('players')
+                            .get();
+
+                        // Delete all players
+                        const batch = db.batch();
+                        playersSnapshot.forEach(playerDoc => {
+                            batch.delete(playerDoc.ref);
+                        });
+
+                        // Delete the room
+                        batch.delete(doc.ref);
+
+                        await batch.commit();
+                        console.log(`Deleted inactive room: ${roomId}`);
+                    } catch (error) {
+                        console.error(`Error deleting room ${roomId}:`, error);
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error checking inactive rooms:', error);
+            });
+    }
+
+    async updateRoomActivity() {
+        try {
+            await db.collection('rooms').doc(this.currentRoom).update({
+                lastActive: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (error) {
+            console.error('Error updating room activity:', error);
+        }
+    }
 
     async loadPlayersList() {
         try {
             const playersRef = db.collection('rooms').doc(this.currentRoom)
                 .collection('players');
-                
+
             const snapshot = await playersRef.get();
-            
+
             const playersList = document.getElementById('playersList');
-            
+
             if (snapshot.empty) {
                 playersList.innerHTML = '<li>No players yet</li>';
                 return;
             }
-            
-            playersList.innerHTML = '';
-            
+
+            // Get room data for the approved words
+            const roomDoc = await db.collection('rooms').doc(this.currentRoom).get();
+            const roomData = roomDoc.data();
+            const approvedWords = roomData.approvedWords || [];
+
+            // Create an array of player data for sorting
+            const players = [];
+
             snapshot.forEach(doc => {
+                const playerData = doc.data();
+                const playerId = doc.id;
+                const bingoGrid = playerData.bingoGrid || [];
+                const markedCells = [];
+
+                // Calculate marked cells based on approved words
+                bingoGrid.forEach((word, index) => {
+                    const wordIndex = this.bingoWords.indexOf(word);
+                    if (approvedWords.includes(wordIndex)) {
+                        markedCells.push(index);
+                    }
+                });
+
+                // Check if player has bingo
+                const hasBingo = this.checkBingo(markedCells, this.bingoSize);
+
+                players.push({
+                    id: playerId,
+                    markedCount: markedCells.length,
+                    totalCells: bingoGrid.length,
+                    hasBingo: hasBingo
+                });
+            });
+
+            // Sort players by score (default sort)
+            players.sort((a, b) => {
+                // Sort by bingo first
+                if (a.hasBingo && !b.hasBingo) return -1;
+                if (!a.hasBingo && b.hasBingo) return 1;
+
+                // Then by marked count
+                return b.markedCount - a.markedCount;
+            });
+
+            // Add sorting controls
+            playersList.innerHTML = `
+            <div class="sort-controls">
+                <span>Sort by:</span>
+                <button id="sortByName" class="btn-sort">Name</button>
+                <button id="sortByScore" class="btn-sort active">Score</button>
+            </div>
+        `;
+
+            // Add the sorted players
+            players.forEach(player => {
+                const score = player.hasBingo ?
+                    `<span class="score bingo">BINGO! 🎉</span>` :
+                    `<span class="score">${player.markedCount}/${player.totalCells}</span>`;
+
                 const playerItem = document.createElement('li');
                 playerItem.className = 'player-item';
-                playerItem.dataset.playerId = doc.id;
-                playerItem.textContent = doc.id;
-                
-                playerItem.addEventListener('click', () => {
-                    this.showPlayerBingoCard(doc.id);
-                    
-                    // Set active class
-                    document.querySelectorAll('.player-item').forEach(item => {
-                        item.classList.remove('active');
-                    });
-                    playerItem.classList.add('active');
-                });
-                
+                playerItem.dataset.playerId = player.id;
+
+                playerItem.innerHTML = `
+                <div class="player-info">
+                    <span class="player-name">${player.id}</span>
+                    ${score}
+                </div>
+                <button class="delete-player" title="Remove player">✕</button>
+            `;
+
                 playersList.appendChild(playerItem);
+            });
+
+            // Add event listeners to players
+            document.querySelectorAll('.player-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    // Skip if the delete button was clicked
+                    if (e.target.classList.contains('delete-player')) return;
+
+                    const playerId = item.dataset.playerId;
+                    this.showPlayerBingoCard(playerId);
+
+                    // Set active class
+                    document.querySelectorAll('.player-item').forEach(i => {
+                        i.classList.remove('active');
+                    });
+                    item.classList.add('active');
+                });
+            });
+
+            // Add event listeners to delete buttons
+            document.querySelectorAll('.delete-player').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent player selection
+                    const playerId = button.closest('.player-item').dataset.playerId;
+                    this.deletePlayer(playerId);
+                });
+            });
+
+            // Add event listeners to sort buttons
+            document.getElementById('sortByName').addEventListener('click', () => {
+                this.sortPlayers('name');
+            });
+
+            document.getElementById('sortByScore').addEventListener('click', () => {
+                this.sortPlayers('score');
             });
         } catch (error) {
             console.error('Error loading players list:', error);
         }
     }
-
 
     async showPlayerBingoCard(playerId) {
         try {
@@ -675,56 +923,6 @@ class StreamBingo {
 
         } catch (error) {
             console.error('Error showing player bingo card:', error);
-        }
-    }
-
-
-    async approveMark(playerId, index) {
-        try {
-            const playerRef = db.collection('rooms').doc(this.currentRoom)
-                .collection('players').doc(playerId);
-                
-            const playerDoc = await playerRef.get();
-            const playerData = playerDoc.data();
-            
-            const pendingMarks = playerData.pendingMarks || [];
-            const markedCells = playerData.markedCells || [];
-            
-            // Remove from pending and add to marked
-            const updatedPending = pendingMarks.filter(i => i !== index);
-            const updatedMarked = [...markedCells, index];
-            
-            await playerRef.update({
-                pendingMarks: updatedPending,
-                markedCells: updatedMarked
-            });
-            
-            this.showNotification(`Approved mark for ${playerId}`);
-        } catch (error) {
-            console.error('Error approving mark:', error);
-        }
-    }
-
-    async rejectMark(playerId, index) {
-        try {
-            const playerRef = db.collection('rooms').doc(this.currentRoom)
-                .collection('players').doc(playerId);
-                
-            const playerDoc = await playerRef.get();
-            const playerData = playerDoc.data();
-            
-            const pendingMarks = playerData.pendingMarks || [];
-            
-            // Remove from pending
-            const updatedPending = pendingMarks.filter(i => i !== index);
-            
-            await playerRef.update({
-                pendingMarks: updatedPending
-            });
-            
-            this.showNotification(`Rejected mark for ${playerId}`);
-        } catch (error) {
-            console.error('Error rejecting mark:', error);
         }
     }
 
@@ -1042,6 +1240,8 @@ class StreamBingo {
             console.error('Error marking cell:', error);
             this.showNotification('Error requesting approval');
         }
+
+        this.updateRoomActivity();
     }
 
     checkBingo(markedCells, size) {
@@ -1263,6 +1463,7 @@ class StreamBingo {
             console.error('Error toggling word approval:', error);
             this.showNotification('Error updating word status');
         }
+        this.updateRoomActivity();
     }
 
     updatePlayerBingoCard(playerId, playerData, roomData) {

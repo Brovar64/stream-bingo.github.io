@@ -239,6 +239,155 @@ body {
     opacity: 0;
 }
 
+
+/* Updated player list styles */
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.player-info {
+    display: flex;
+    justify-content: space-between;
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.score {
+    font-weight: bold;
+}
+
+.score.bingo {
+    color: #FF4081;
+}
+
+.delete-player {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: all 0.2s;
+}
+
+.delete-player:hover {
+    opacity: 1;
+    color: #FF4081;
+    background: rgba(255, 64, 129, 0.1);
+}
+
+.sort-controls {
+    padding: 8px;
+    background: #222;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-sort {
+    background: none;
+    border: none;
+    color: #CCC;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.btn-sort.active {
+    color: white;
+    background: #333;
+    font-weight: bold;
+}
+
+/* Bingo words grid */
+.bingo-words-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.bingo-word {
+    background-color: #2D2D2D;
+    border-radius: 8px;
+    padding: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bingo-word:hover {
+    background-color: #3A3A3A;
+}
+
+.bingo-word.approved {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.approved-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.player-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.player-icon {
+    width: 24px;
+    height: 24px;
+    background-color: #FF4081;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+/* Updated bingo cell styles */
+.bingo-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    min-height: 80px;
+}
+
+.bingo-cell.pending {
+    background-color: #FFA000;
+    position: relative;
+}
+
+.bingo-cell.pending:after {
+    content: 'Pending approval';
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+    right: 0;
+    font-size: 0.65rem;
+    font-weight: normal;
+    opacity: 0.9;
+}
+
 @keyframes slideUp {
     from {
         transform: translate(-50%, 20px);
