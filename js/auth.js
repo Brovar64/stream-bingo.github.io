@@ -9,8 +9,8 @@ class AuthManager {
             ? 'http://localhost:8080'
             : 'https://brovar64.github.io/stream-bingo';
             
-        // Use the dedicated callback page
-        this.REDIRECT_URI = `${baseUrl}/twitch-callback.html`;
+        // Use index.html as the redirect URI since that's what's configured in Twitch
+        this.REDIRECT_URI = `${baseUrl}/index.html`;
         
         // Log the redirect URI to make it very clear what we're using
         console.log('=== TWITCH REDIRECT URI ===');
