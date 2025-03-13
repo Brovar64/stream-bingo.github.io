@@ -81,10 +81,18 @@ class AuthManager {
                 this.handleTwitchCallback(accessToken)
                     .then(() => {
                         console.log("Successfully authenticated with Twitch!");
-                        // Manually trigger the app initialization
+                        // Ensure streamBingo is initialized properly
                         if (window.streamBingo) {
-                            window.streamBingo.init();
+                            // Force a dashboard display after authentication
+                            if (window.streamBingo.showDashboard) {
+                                window.streamBingo.showDashboard();
+                            } else {
+                                window.streamBingo.init();
+                            }
                         } else {
+                            // If streamBingo object isn't available yet, create a flag to show dashboard
+                            window.showDashboardAfterLoad = true;
+                            // Reload as fallback
                             window.location.reload();
                         }
                     })
