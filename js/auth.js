@@ -3,35 +3,10 @@ class AuthManager {
     constructor() {
         this.currentUser = null;
         this.TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
-        this.REDIRECT_URI = 'http://localhost:63342/stream-bingo/';
+        this.REDIRECT_URI = 'http://localhost:63342/stream-bingo/auth-callback.html';
 
         // Check for existing login
-        this.checkForAuthCallback();
         this.loadUserFromStorage();
-    }
-
-    checkForAuthCallback() {
-        const hash = window.location.hash.substring(1);
-        if (hash && hash.includes('access_token=')) {
-            const params = new URLSearchParams(hash);
-            const accessToken = params.get('access_token');
-
-            if (accessToken) {
-                // Clear the hash from the URL to prevent issues on refresh
-                history.replaceState(null, null, ' ');
-
-                // Handle the auth callback
-                this.handleTwitchCallback(accessToken)
-                    .then(() => {
-                        console.log('Successfully authenticated with Twitch');
-                        // Force refresh to load proper UI after auth
-                        window.location.reload();
-                    })
-                    .catch(error => {
-                        console.error('Authentication error:', error);
-                    });
-            }
-        }
     }
 
     loadUserFromStorage() {
@@ -77,14 +52,21 @@ class AuthManager {
 
     // Handle Twitch authentication response
     handleTwitchCallback(accessToken) {
+        console.log("Handling Twitch callback with token:", accessToken);
         return fetch('https://api.twitch.tv/helix/users', {
             headers: {
                 'Client-ID': this.TWITCH_CLIENT_ID,
                 'Authorization': `Bearer ${accessToken}`
             }
         })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log("Received Twitch user data:", data);
                 if (data.data && data.data.length > 0) {
                     const userData = data.data[0];
                     const user = {
@@ -100,6 +82,10 @@ class AuthManager {
                     return user;
                 }
                 throw new Error('Failed to get user data');
+            })
+            .catch(error => {
+                console.error("Error in Twitch callback:", error);
+                throw error;
             });
     }
 
