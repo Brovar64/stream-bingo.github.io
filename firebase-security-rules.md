@@ -1,78 +1,53 @@
-## Firebase Security Rules
+## Firebase Security Rules for Stream Bingo
 
-These security rules should be configured in your Firebase project to ensure proper operation of the Stream Bingo app.
-
-### Firestore Rules
-
-For testing purposes, you can start with these permissive rules:
-
-```javascript
+### Development Rules (VERY PERMISSIVE - FOR TESTING ONLY)
+```firestore
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow all read and write operations during development
     match /{document=**} {
-      allow read, write: if true;  // WARNING: Only for testing!
-    }
-  }
-}
-```
-
-### Production Rules (Recommended for later)
-
-For production, use more restrictive rules like:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Allow test connections
-    match /_connection_test/{document} {
       allow read, write: if true;
     }
-    
-    // Room data
+  }
+}
+```
+
+### Recommended Production Rules
+```firestore
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Rooms collection
     match /rooms/{roomId} {
-      allow read: if true;  // Anyone can view room details
-      allow create: if request.auth != null;  // Only authenticated users can create
-      allow update, delete: if request.auth != null && 
-        (resource.data.creatorId == request.auth.uid || resource.data.admins[request.auth.uid] == true);
-      
-      // Player data within rooms
-      match /players/{playerId} {
-        allow read: if true;
-        allow write: if request.auth != null && 
-          (playerId == request.auth.uid || 
-           get(/databases/$(database)/documents/rooms/$(roomId)).data.admins[request.auth.uid] == true);
-      }
-      
-      // Bingo words within rooms
-      match /words/{wordId} {
-        allow read: if true;
-        allow write: if request.auth != null && 
-          get(/databases/$(database)/documents/rooms/$(roomId)).data.admins[request.auth.uid] == true;
-      }
-    }
-    
-    // User profiles
-    match /users/{userId} {
+      // Anyone can read room details
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // Create rooms with some basic validation
+      allow create: if request.auth != null 
+                    && request.resource.data.keys().hasAll(['createdAt', 'gridSize', 'creatorId', 'active'])
+                    && request.resource.data.gridSize is int
+                    && request.resource.data.gridSize >= 3 
+                    && request.resource.data.gridSize <= 5;
+      
+      // Update rules: Only creator or players can modify
+      allow update: if request.auth != null 
+                    && (request.resource.data.creatorId == request.auth.uid 
+                        || resource.data.players.map(p => p.nickname).hasAny([request.auth.uid]));
     }
   }
 }
 ```
 
-### Instructions for Applying Rules
-
-1. Go to [Firebase Console](https://console.firebase.google.com/)
+### Deployment Instructions
+1. Go to Firebase Console
 2. Select your project
-3. Click on "Firestore Database" in the left sidebar
-4. Select the "Rules" tab
-5. Replace the content with one of the rule sets above
+3. Go to Firestore Database
+4. Select "Rules" tab
+5. Replace existing rules with one of the above sets
 6. Click "Publish"
 
-### Important Security Considerations
-
-- The testing rules allow anyone to read and write to your database
-- Only use the testing rules in development
-- Switch to the production rules before making your app public
+### Security Considerations
+- Development rules allow ALL access - NEVER use in production
+- Production rules add basic validation and access control
+- Always test thoroughly before deploying to production
