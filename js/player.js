@@ -42,12 +42,15 @@ class PlayerController {
             
             try {
                 // Add player to room
-                await roomRef.update({
-                    players: firebase.firestore.FieldValue.arrayUnion({
-                        nickname: nickname,
-                        joinedAt: new Date().toISOString()
-                    })
+                const players = [...(roomData.players || [])];
+                players.push({
+                    nickname: nickname,
+                    joinedAt: new Date().toISOString()
                 });
+                
+                await roomRef.set({
+                    players: players
+                }, { merge: true });
                 
                 window.showNotification(`Successfully joined room ${roomCode}!`, 'success');
                 
@@ -95,27 +98,29 @@ class PlayerController {
             const roomDoc = await roomRef.get();
             const roomData = roomDoc.data();
             
+            const cellKey = `${row}_${col}`;
+            
             if (!roomData.playerGrids || !roomData.playerGrids[playerName]) {
                 window.showNotification('Your grid data is not available', 'error');
                 return false;
             }
             
             const playerGrid = roomData.playerGrids[playerName];
-            if (!playerGrid[row] || !playerGrid[row][col]) {
+            if (!playerGrid[cellKey]) {
                 window.showNotification('Invalid cell coordinates', 'error');
                 return false;
             }
             
             // If cell is already marked or approved, do nothing
-            if (playerGrid[row][col].marked || playerGrid[row][col].approved) {
+            if (playerGrid[cellKey].marked || playerGrid[cellKey].approved) {
                 return false;
             }
             
-            // Mark the cell as pending approval
-            playerGrid[row][col].marked = true;
+            // Create a deep copy of player grids
+            const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids));
             
-            // Update player grid
-            const updatedPlayerGrids = { ...roomData.playerGrids };
+            // Mark the cell as pending approval
+            playerGrids[playerName][cellKey].marked = true;
             
             // Add to pending approvals
             const pendingApprovals = [...(roomData.pendingApprovals || [])];
@@ -123,16 +128,16 @@ class PlayerController {
                 playerName,
                 row,
                 col,
-                word: playerGrid[row][col].word,
+                word: playerGrid[cellKey].word,
                 timestamp: new Date().toISOString()
             });
             
             // Update room
             try {
-                await roomRef.update({
-                    playerGrids: updatedPlayerGrids,
-                    pendingApprovals
-                });
+                await roomRef.set({
+                    playerGrids: playerGrids,
+                    pendingApprovals: pendingApprovals
+                }, { merge: true });
                 
                 window.showNotification('Marked cell, waiting for admin approval', 'success');
                 return true;
