@@ -29,31 +29,32 @@ An interactive bingo game for streamers and their audience. Streamers can create
 
 ## Production Setup
 
-### Firebase Setup (Important for App to Work!)
+### Firebase Setup and Deployment
 
-1. Create a Firebase project at [firebase.google.com](https://firebase.google.com)
-2. Enable Firestore Database and Authentication in your Firebase project
-3. Get your Firebase configuration (Project Settings > General > Your apps > Firebase SDK snippet)
-4. **DIRECT EDIT REQUIRED:** Open the file `js/firebase-config.js` and replace the placeholder values with your actual Firebase credentials
+The app uses GitHub Actions to securely deploy your Firebase configuration to GitHub Pages.
 
-```javascript
-// REPLACE THESE VALUES with your actual Firebase project values
-const firebaseConfig = {
-    apiKey: "YOUR_ACTUAL_API_KEY",
-    authDomain: "YOUR_ACTUAL_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_ACTUAL_PROJECT_ID",
-    storageBucket: "YOUR_ACTUAL_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_ACTUAL_MESSAGING_SENDER_ID",
-    appId: "YOUR_ACTUAL_APP_ID",
-    measurementId: "YOUR_ACTUAL_MEASUREMENT_ID"
-};
-```
+1. **Firebase Setup**:
+   - Create a Firebase project at [firebase.google.com](https://firebase.google.com)
+   - Enable Firestore Database and Authentication
+   - Get your Firebase configuration values
 
-5. Commit this change to your repository
+2. **GitHub Secrets**:
+   - The following GitHub secrets should be set up in your repository:
+   - `FIREBASE_API_KEY`
+   - `FIREBASE_AUTH_DOMAIN`
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_STORAGE_BUCKET`
+   - `FIREBASE_MESSAGING_SENDER_ID`
+   - `FIREBASE_APP_ID`
+   - `FIREBASE_MEASUREMENT_ID`
+
+3. **Deployment**:
+   - After updating any GitHub secrets, manually trigger the "Build and Deploy" GitHub Action in the Actions tab
+   - This will securely deploy your app with the Firebase configuration
 
 ### Security Rules
 
-For proper Firebase security, add the security rules from the `firebase-security-rules.md` file to your Firebase project's security rules.
+Set up your Firebase security rules as specified in the `firebase-security-rules.md` file in your Firebase project.
 
 ## Technologies Used
 
@@ -61,3 +62,4 @@ For proper Firebase security, add the security rules from the `firebase-security
 - Firebase Firestore (realtime database)
 - Firebase Authentication
 - GitHub Pages
+- GitHub Actions (for secure deployment)
