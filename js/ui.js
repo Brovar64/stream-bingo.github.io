@@ -206,49 +206,6 @@ function addEnhancedStyles() {
             100% { transform: scale(1); }
         }
         
-        /* Toast notifications */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .toast {
-            padding: 12px 20px;
-            border-radius: 4px;
-            color: white;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-            transform: translateX(100%);
-            opacity: 0;
-            transition: transform 0.3s, opacity 0.3s;
-        }
-        
-        .toast.show {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        
-        .toast-info {
-            background-color: #2196F3;
-        }
-        
-        .toast-success {
-            background-color: #4CAF50;
-        }
-        
-        .toast-error {
-            background-color: #F44336;
-        }
-        
-        .toast-warning {
-            background-color: #FFC107;
-            color: #333;
-        }
-        
         /* Player waiting animation */
         .waiting-animation {
             margin: 20px 0;
@@ -343,29 +300,6 @@ function addEnhancedStyles() {
             font-size: 1.8rem;
             font-weight: bold;
             color: #FF4081;
-        }
-        
-        /* Modal improvements */
-        .modal {
-            background-color: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(3px);
-        }
-        
-        .modal-content {
-            border: 1px solid #333;
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Confirm dialog */
-        .confirm-dialog {
-            padding: 10px 0;
-        }
-        
-        .confirm-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 20px;
         }
         
         /* Cell marking animation */
