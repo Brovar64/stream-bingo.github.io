@@ -169,7 +169,7 @@ class AdminController {
         try {
             const roomRef = window.db.collection('rooms').doc(roomId);
             const roomDoc = await roomRef.get();
-            const roomData = roomDoc.data();
+            let roomData = roomDoc.data();  // Changed from const to let
             
             // If the game is already active, show a restart option
             if (roomData.status === 'active') {
