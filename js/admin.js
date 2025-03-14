@@ -113,10 +113,23 @@ class AdminController {
             
             const roomRef = window.db.collection('rooms').doc(roomId);
             
-            // Add word to the words array
-            await roomRef.update({
-                words: firebase.firestore.FieldValue.arrayUnion(word)
-            });
+            // First, get the current document
+            const roomDoc = await roomRef.get();
+            if (!roomDoc.exists) {
+                window.showNotification('Room not found', 'error');
+                return false;
+            }
+            
+            // Get existing data
+            const roomData = roomDoc.data();
+            
+            // Create a new words array by copying the existing one and adding the new word
+            const words = [...(roomData.words || []), word];
+            
+            // Update the document using set with merge instead of update
+            await roomRef.set({
+                words: words
+            }, { merge: true });
             
             window.showNotification(`Added "${word}" to the word list`, 'success');
             return true;
@@ -138,7 +151,9 @@ class AdminController {
                 const wordToRemove = words[index];
                 words.splice(index, 1);
                 
-                await roomRef.update({ words });
+                // Use set with merge instead of update
+                await roomRef.set({ words }, { merge: true });
+                
                 window.showNotification(`Removed "${wordToRemove}" from the word list`, 'success');
                 return true;
             }
@@ -166,11 +181,11 @@ class AdminController {
                 return false;
             }
             
-            // Update room status to active
-            await roomRef.update({
+            // Update room status to active using set with merge
+            await roomRef.set({
                 status: 'active',
                 startedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
             
             window.showNotification('Game started successfully!', 'success');
             
@@ -236,8 +251,9 @@ class AdminController {
                 playerGrids[player.nickname] = grid;
             }
             
-            // Update room with player grids
-            await roomRef.update({ playerGrids });
+            // Update room with player grids using set with merge
+            await roomRef.set({ playerGrids }, { merge: true });
+            
             window.showNotification('Assigned bingo grids to all players', 'success');
             return true;
         } catch (error) {
@@ -264,18 +280,20 @@ class AdminController {
             
             // Update player grid
             if (roomData.playerGrids && roomData.playerGrids[playerName]) {
-                const playerGrid = roomData.playerGrids[playerName];
+                const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids)); // Deep clone
+                const playerGrid = playerGrids[playerName];
+                
                 if (playerGrid[row] && playerGrid[row][col]) {
                     playerGrid[row][col].approved = true;
                     
-                    // Update the playerGrids and remove the approval
-                    const updatedPlayerGrids = { ...roomData.playerGrids };
+                    // Remove the approval
                     pendingApprovals.splice(approvalIndex, 1);
                     
-                    await roomRef.update({
-                        playerGrids: updatedPlayerGrids,
-                        pendingApprovals
-                    });
+                    // Use set with merge to update both playerGrids and pendingApprovals
+                    await roomRef.set({
+                        playerGrids: playerGrids,
+                        pendingApprovals: pendingApprovals
+                    }, { merge: true });
                     
                     window.showNotification(`Approved ${playerName}'s mark`, 'success');
                     
@@ -284,10 +302,16 @@ class AdminController {
                     if (hasBingo) {
                         window.showNotification(`${playerName} has BINGO!`, 'success');
                         
-                        // Update room with bingo winner
-                        await roomRef.update({
-                            bingoWinners: firebase.firestore.FieldValue.arrayUnion(playerName)
-                        });
+                        // Update room with bingo winner using a separate call
+                        try {
+                            let winners = roomData.bingoWinners || [];
+                            if (!winners.includes(playerName)) {
+                                winners.push(playerName);
+                                await roomRef.set({ bingoWinners: winners }, { merge: true });
+                            }
+                        } catch (winnerError) {
+                            console.error('Error updating bingo winners:', winnerError);
+                        }
                     }
                     
                     return true;
@@ -318,19 +342,21 @@ class AdminController {
             
             // Update player grid
             if (roomData.playerGrids && roomData.playerGrids[playerName]) {
-                const playerGrid = roomData.playerGrids[playerName];
+                const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids)); // Deep clone
+                const playerGrid = playerGrids[playerName];
+                
                 if (playerGrid[row] && playerGrid[row][col]) {
                     playerGrid[row][col].marked = false;
                     playerGrid[row][col].approved = false;
                     
-                    // Update the playerGrids and remove the approval
-                    const updatedPlayerGrids = { ...roomData.playerGrids };
+                    // Remove the approval
                     pendingApprovals.splice(approvalIndex, 1);
                     
-                    await roomRef.update({
-                        playerGrids: updatedPlayerGrids,
-                        pendingApprovals
-                    });
+                    // Use set with merge to update both playerGrids and pendingApprovals
+                    await roomRef.set({
+                        playerGrids: playerGrids,
+                        pendingApprovals: pendingApprovals
+                    }, { merge: true });
                     
                     window.showNotification(`Rejected ${playerName}'s mark`, 'success');
                     return true;
