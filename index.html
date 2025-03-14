@@ -39,18 +39,17 @@
 
 <!-- Direct Firebase Initialization -->
 <script>
-// Initialize Firebase directly in index.html to avoid any loading issues
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        // Demo Firebase config with test values
+        // Actual Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyA-test-key-for-fallback",
-            authDomain: "test-project.firebaseapp.com",
-            projectId: "test-project",
-            storageBucket: "test-project.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef123456",
-            measurementId: "G-ABCDEF1234"
+            apiKey: "AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU",
+            authDomain: "stream-bingo-ecb40.firebaseapp.com",
+            projectId: "stream-bingo-ecb40",
+            storageBucket: "stream-bingo-ecb40.appspot.com",
+            messagingSenderId: "814141306111",
+            appId: "1:814141306111:web:319ac02de11210186408ca",
+            measurementId: "G-1DYM2MTE10"
         };
         
         // Initialize Firebase
@@ -59,6 +58,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Initialize services
         window.db = firebase.firestore();
+        
+        // Enable offline persistence
+        firebase.firestore().enablePersistence()
+            .catch((err) => {
+                if (err.code === 'failed-precondition') {
+                    console.warn('Multiple tabs open, persistence can only be enabled in one tab.');
+                } else if (err.code === 'unimplemented') {
+                    console.warn('Browser does not support offline persistence.');
+                }
+            });
+        
         window.auth = firebase.auth();
         
         console.log('Firebase initialized successfully!');
@@ -79,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- App Scripts - Don't need firebase-config.js anymore -->
+<!-- App Scripts -->
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 
