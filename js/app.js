@@ -1,4 +1,4 @@
-// Stream Bingo App
+// Stream Bingo App - Version 2.0
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing app...');
     try {
@@ -10,38 +10,27 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Check for hash in URL (this might be a Twitch redirect)
-        const hash = window.location.hash;
-        if (hash && hash.includes('access_token=')) {
-            console.log('Found access token in URL hash, likely a Twitch redirect');
+        // Ensure Firebase is initialized
+        if (!window.firebase) {
+            throw new Error('Firebase SDK not loaded');
         }
         
-        const app = new StreamBingo();
-        window.streamBingo = app;
-        
-        // Small delay to ensure Firebase and auth managers are initialized
-        setTimeout(() => {
-            try {
+        // Wait for Firestore to initialize
+        const checkFirestoreReady = () => {
+            if (window.db) {
+                console.log('✅ Firestore is ready');
+                const app = new StreamBingo();
+                window.streamBingo = app;
                 app.init();
-                
-                // Check if we need to show the dashboard after auth callback
-                if (window.showDashboardAfterLoad) {
-                    console.log('Showing dashboard after auth callback');
-                    app.showDashboard();
-                    window.showDashboardAfterLoad = false;
-                }
-            } catch (err) {
-                console.error('Error during app initialization:', err);
-                document.getElementById('app').innerHTML = `
-                    <div style="text-align: center; margin-top: 100px;">
-                        <h2>Initialization Error</h2>
-                        <p>There was a problem loading the application.</p>
-                        <p style="color: #ff6b6b;">Error: ${err.message || 'Unknown error'}</p>
-                        <button onclick="window.location.reload()" class="btn btn-primary" style="margin-top: 20px;">Reload App</button>
-                    </div>
-                `;
+            } else {
+                console.log('Waiting for Firestore to initialize...');
+                setTimeout(checkFirestoreReady, 100);
             }
-        }, 100);
+        };
+        
+        // Start checking if Firestore is ready
+        checkFirestoreReady();
+        
     } catch (err) {
         console.error('Critical error during app startup:', err);
         document.getElementById('app').innerHTML = `
@@ -54,8 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 });
-
-
 
 class StreamBingo {
     constructor() {
@@ -76,11 +63,17 @@ class StreamBingo {
         if (!this.auth) {
             console.error('Auth manager not initialized! This might cause login issues.');
         }
+        
+        // Verify Firebase is available
+        if (!window.db) {
+            console.error('Firestore is not initialized! Database functions will not work.');
+        }
     }
 
     init() {
         console.log('Initializing StreamBingo app...');
         console.log('Auth manager available:', !!this.auth);
+        console.log('Firestore available:', !!window.db);
         
         if (this.auth) {
             console.log('User logged in:', this.auth.isLoggedIn());
@@ -174,6 +167,20 @@ class StreamBingo {
         
         .separator span {
             padding: 0 10px;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #333;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
         }
     `;
         document.head.appendChild(style);
@@ -315,19 +322,27 @@ class StreamBingo {
         console.log('Dashboard displayed successfully');
     }
 
-// The rest of the class remains the same as it's working fine
-// Add a new screen for managing bingo lists
     showBingoListsScreen() {
+        this.showNotification('Bingo lists management coming soon!');
         // We'll add this part next if you like this approach
     }
 
     async checkRoomExists(roomCode) {
         try {
-            // Use window.db instead of db
+            // Check if Firestore is available
+            if (!window.db) {
+                console.error('Firestore is not available');
+                this.showNotification('Database connection not available');
+                return false;
+            }
+            
+            console.log(`Checking if room ${roomCode} exists...`);
             const roomDoc = await window.db.collection('rooms').doc(roomCode).get();
+            console.log(`Room ${roomCode} exists:`, roomDoc.exists);
             return roomDoc.exists;
         } catch (error) {
             console.error('Error checking room:', error);
+            this.showNotification('Error checking room: ' + error.message);
             return false;
         }
     }
@@ -387,7 +402,7 @@ class StreamBingo {
             </div>
         `;
 
-        document.getElementById('back').addEventListener('click', () => this.showWelcomeScreen());
+        document.getElementById('back').addEventListener('click', () => this.showDashboard());
         document.getElementById('create').addEventListener('click', () => this.createRoom());
     }
 
@@ -418,65 +433,72 @@ class StreamBingo {
             </div>
         `;
 
-        document.getElementById('back').addEventListener('click', () => this.showWelcomeScreen());
+        document.getElementById('back').addEventListener('click', () => this.showDashboard());
         document.getElementById('join').addEventListener('click', () => this.handleJoinRoom());
     }
     
-    // Added function for handling join room
     async handleJoinRoom() {
-        const nickname = document.getElementById('nickname').value.trim();
-        const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-        
-        if (!nickname || !roomCode) {
-            this.showNotification('Please enter both nickname and room code');
-            return;
-        }
-        
-        // Check if the room exists
-        const roomExists = await this.checkRoomExists(roomCode);
-        
-        if (!roomExists) {
-            this.showNotification('Room not found. Please check the room code.');
-            return;
-        }
-        
-        // Add player to the room
         try {
-            // TODO: Add Firebase logic to join the room
+            const nickname = document.getElementById('nickname').value.trim();
+            const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
             
-            // For now, just show a notification
+            if (!nickname || !roomCode) {
+                this.showNotification('Please enter both nickname and room code');
+                return;
+            }
+            
+            if (!window.db) {
+                this.showNotification('Database connection not available');
+                return;
+            }
+            
+            // Check if the room exists
+            console.log('Checking if room exists:', roomCode);
+            const roomExists = await this.checkRoomExists(roomCode);
+            
+            if (!roomExists) {
+                this.showNotification('Room not found. Please check the room code.');
+                return;
+            }
+            
+            // Add player to the room
             this.showNotification(`Joined room ${roomCode} as ${nickname}`);
+                
+            // In the future, you'd implement the actual room joining logic here
             
-            // Show the game screen
-            // this.showGameScreen(roomCode, nickname, false);
         } catch (error) {
             console.error('Error joining room:', error);
-            this.showNotification('Error joining room. Please try again.');
+            this.showNotification('Error joining room: ' + error.message);
         }
     }
 
-    // Method to create a room (placeholder implementation)
     async createRoom() {
-        const nickname = document.getElementById('nickname').value.trim();
-        const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-        const gridSize = parseInt(document.getElementById('gridSize').value);
-        
-        if (!nickname || !roomCode) {
-            this.showNotification('Please enter both nickname and room code');
-            return;
-        }
-        
-        // Check if room already exists
-        const roomExists = await this.checkRoomExists(roomCode);
-        
-        if (roomExists) {
-            this.showNotification('Room code already exists. Please choose a different code.');
-            return;
-        }
-        
-        // Create room in Firebase
         try {
-            // Create room in Firestore
+            const nickname = document.getElementById('nickname').value.trim();
+            const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+            const gridSize = parseInt(document.getElementById('gridSize').value);
+            
+            if (!nickname || !roomCode) {
+                this.showNotification('Please enter both nickname and room code');
+                return;
+            }
+            
+            if (!window.db) {
+                this.showNotification('Database connection not available');
+                return;
+            }
+            
+            // Check if room already exists
+            console.log('Checking if room exists before creating:', roomCode);
+            const roomExists = await this.checkRoomExists(roomCode);
+            
+            if (roomExists) {
+                this.showNotification('Room code already exists. Please choose a different code.');
+                return;
+            }
+            
+            // Create room in Firebase
+            console.log('Creating room:', roomCode);
             await window.db.collection('rooms').doc(roomCode).set({
                 createdAt: new Date(),
                 gridSize: gridSize,
@@ -486,15 +508,17 @@ class StreamBingo {
             
             this.showNotification(`Created room ${roomCode} with grid size ${gridSize}x${gridSize}`);
             
-            // Show the admin game screen
-            // this.showGameScreen(roomCode, nickname, true);
+            // In the future, you'd implement the actual game screen here
+            
         } catch (error) {
             console.error('Error creating room:', error);
-            this.showNotification('Error creating room. Please try again.');
+            this.showNotification('Error creating room: ' + error.message);
         }
     }
     
     showNotification(message) {
+        console.log('NOTIFICATION:', message);
+        
         // Remove existing notifications
         const existingNotifications = document.querySelectorAll('.notification');
         existingNotifications.forEach(notification => {
@@ -514,7 +538,10 @@ class StreamBingo {
         
         // Remove notification after 3 seconds
         setTimeout(() => {
-            notification.remove();
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
         }, 3000);
     }
 }
