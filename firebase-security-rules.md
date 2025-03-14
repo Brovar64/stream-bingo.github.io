@@ -1,33 +1,30 @@
-# Firebase Security Rules
+## Firebase Security Rules for Stream Bingo
 
-Copy and paste these rules in your Firebase Console (Firestore → Rules):
-
-```
+### Development Rules (VERY PERMISSIVE - FOR TESTING ONLY)
+```firestore
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Room access
-    match /rooms/{roomId} {
-      allow read: if true; // Allow reading room data
-      allow create: if true; // Allow creating new rooms
-      allow update: if request.auth != null || 
-                    resource.data.adminId == request.resource.data.adminId; // Only admin can update
-      allow delete: if false; // Prevent deletion
-      
-      // Players in rooms
-      match /players/{playerId} {
-        allow read: if true; // Anyone can read player data
-        allow create: if true; // Allow joining
-        allow update: if playerId == request.resource.data.nickname || // Player can update own data
-                      get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId == request.auth.uid; // Or admin
-        allow delete: if false; // Prevent deletion
-      }
+    // Allow all read and write operations during development
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
 ```
 
-These rules ensure:
-- Only the admin can update room settings
-- Players can only update their own bingo cards
-- No one can delete data
+### Important Notes
+1. These DEVELOPMENT rules allow ALL access to your database
+2. NEVER use these rules in a production environment
+3. Always replace with more restrictive rules before deploying
+
+### Deployment Steps
+1. Go to Firebase Console
+2. Select your project
+3. Navigate to Firestore Database
+4. Select "Rules" tab
+5. Replace existing rules with the development rules above
+6. Click "Publish"
+
+### Security Warning
+Keeping these open rules on a live project can expose your data to unauthorized access!
