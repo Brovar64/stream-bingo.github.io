@@ -1,4 +1,4 @@
-// Stream Bingo App - Version 2.0
+// Stream Bingo App - Version 2.1
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing app...');
     try {
@@ -10,26 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Ensure Firebase is initialized
-        if (!window.firebase) {
-            throw new Error('Firebase SDK not loaded');
-        }
-        
-        // Wait for Firestore to initialize
-        const checkFirestoreReady = () => {
-            if (window.db) {
-                console.log('✅ Firestore is ready');
-                const app = new StreamBingo();
-                window.streamBingo = app;
-                app.init();
-            } else {
-                console.log('Waiting for Firestore to initialize...');
-                setTimeout(checkFirestoreReady, 100);
-            }
-        };
-        
-        // Start checking if Firestore is ready
-        checkFirestoreReady();
+        // Initialize app
+        const app = new StreamBingo();
+        window.streamBingo = app;
+        app.init();
         
     } catch (err) {
         console.error('Critical error during app startup:', err);
@@ -63,16 +47,18 @@ class StreamBingo {
         if (!this.auth) {
             console.error('Auth manager not initialized! This might cause login issues.');
         }
-        
-        // Verify Firebase is available
-        if (!window.db) {
-            console.error('Firestore is not initialized! Database functions will not work.');
-        }
     }
 
     init() {
         console.log('Initializing StreamBingo app...');
         console.log('Auth manager available:', !!this.auth);
+        
+        // Initialize Firestore if needed
+        if (!window.db && window.firebase && window.firebase.firestore) {
+            console.log('Setting up Firestore manually...');
+            window.db = window.firebase.firestore();
+        }
+        
         console.log('Firestore available:', !!window.db);
         
         if (this.auth) {
@@ -330,6 +316,11 @@ class StreamBingo {
     async checkRoomExists(roomCode) {
         try {
             // Check if Firestore is available
+            if (!window.db && window.firebase && window.firebase.firestore) {
+                console.log('Setting up Firestore before checking room...');
+                window.db = window.firebase.firestore();
+            }
+            
             if (!window.db) {
                 console.error('Firestore is not available');
                 this.showNotification('Database connection not available');
@@ -447,6 +438,12 @@ class StreamBingo {
                 return;
             }
             
+            // Set up Firestore if needed
+            if (!window.db && window.firebase && window.firebase.firestore) {
+                console.log('Setting up Firestore before joining room...');
+                window.db = window.firebase.firestore();
+            }
+            
             if (!window.db) {
                 this.showNotification('Database connection not available');
                 return;
@@ -481,6 +478,12 @@ class StreamBingo {
             if (!nickname || !roomCode) {
                 this.showNotification('Please enter both nickname and room code');
                 return;
+            }
+            
+            // Set up Firestore if needed
+            if (!window.db && window.firebase && window.firebase.firestore) {
+                console.log('Setting up Firestore before creating room...');
+                window.db = window.firebase.firestore();
             }
             
             if (!window.db) {
