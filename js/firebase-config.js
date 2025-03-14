@@ -1,18 +1,26 @@
 // Secure Firebase Configuration Loader
 async function initializeFirebase() {
     try {
-        // Use the global CONFIG object directly
-        const firebaseConfig = CONFIG.FIREBASE;
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: 'FIREBASE_API_KEY',
+            authDomain: 'FIREBASE_AUTH_DOMAIN',
+            projectId: 'FIREBASE_PROJECT_ID',
+            storageBucket: 'FIREBASE_STORAGE_BUCKET',
+            messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
+            appId: 'FIREBASE_APP_ID',
+            measurementId: 'FIREBASE_MEASUREMENT_ID'
+        };
         
-        console.log('Initializing Firebase with config:', firebaseConfig);
+        console.log('Attempting Firebase initialization...');
         
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         
-        // Set up global Firebase services
+        // Additional Firebase service initializations
+        firebase.analytics();
         window.db = firebase.firestore();
         window.auth = firebase.auth();
-        window.analytics = firebase.analytics();
         
         console.log('Firebase initialized successfully');
     } catch (error) {
