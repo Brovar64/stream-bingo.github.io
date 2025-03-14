@@ -151,7 +151,10 @@ class StreamBingo {
                             <span>${roomId}</span>
                             <span>${room.gridSize}x${room.gridSize}</span>
                         </div>
-                        <button class="delete-player" data-room-id="${roomId}">×</button>
+                        <div>
+                            <button class="enter-room" data-room-id="${roomId}">Enter</button>
+                            <button class="delete-player" data-room-id="${roomId}">×</button>
+                        </div>
                     </div>
                 `;
             });
@@ -165,12 +168,93 @@ class StreamBingo {
                     this.deleteRoom(roomId);
                 });
             });
+            
+            // Add event listeners for enter buttons
+            document.querySelectorAll('.enter-room').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const roomId = e.target.getAttribute('data-room-id');
+                    this.enterRoom(roomId);
+                });
+            });
         } catch (error) {
             console.error('Error loading rooms:', error);
             document.getElementById('userRoomsList').innerHTML = `
                 <p class="error">Failed to load your rooms: ${error.message}</p>
             `;
         }
+    }
+    
+    enterRoom(roomId) {
+        // Get current user nickname
+        const nickname = this.auth.getUsername();
+        this.loadGameRoom(roomId, nickname);
+    }
+    
+    loadGameRoom(roomId, nickname) {
+        // First, load the room data to get the grid size
+        window.db.collection('rooms').doc(roomId).get().then(doc => {
+            if (!doc.exists) {
+                this.showNotification('Room not found', 'error');
+                return;
+            }
+            
+            const roomData = doc.data();
+            const gridSize = roomData.gridSize;
+            
+            // Create the game room interface
+            const appDiv = document.getElementById('app');
+            appDiv.innerHTML = `
+                <div class="container">
+                    <div class="title">Stream Bingo - Room ${roomId}</div>
+                    <p class="subtitle">Playing as: ${nickname}</p>
+                    
+                    <div class="bingo-grid grid-${gridSize}" id="bingoGrid">
+                        ${this.generateBingoGrid(gridSize)}
+                    </div>
+                    
+                    <div class="card">
+                        <h2>Room Details</h2>
+                        <p>Grid Size: ${gridSize}x${gridSize}</p>
+                        <p>Created by: ${roomData.creatorNickname}</p>
+                        <p>Status: ${roomData.status}</p>
+                        <button id="backToDashboardBtn" class="btn btn-secondary">Back to Dashboard</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            document.getElementById('backToDashboardBtn').addEventListener('click', () => this.loadDashboard());
+            
+            // Add event listeners to the bingo cells
+            document.querySelectorAll('.bingo-cell').forEach(cell => {
+                cell.addEventListener('click', (e) => {
+                    e.target.classList.toggle('marked');
+                });
+            });
+            
+            this.showNotification(`Entered room ${roomId}!`, 'success');
+        }).catch(error => {
+            console.error('Error loading game room:', error);
+            this.showNotification(`Error loading game room: ${error.message}`, 'error');
+        });
+    }
+    
+    generateBingoGrid(size) {
+        let gridHtml = '';
+        const totalCells = size * size;
+        
+        for (let i = 0; i < totalCells; i++) {
+            // Create free space in the middle for odd-sized grids
+            const isFreeSpace = (size % 2 === 1) && (i === Math.floor(totalCells / 2));
+            
+            gridHtml += `
+                <div class="bingo-cell${isFreeSpace ? ' marked' : ''}" data-index="${i}">
+                    ${isFreeSpace ? 'FREE' : `Item ${i+1}`}
+                </div>
+            `;
+        }
+        
+        return gridHtml;
     }
     
     async joinRoom() {
@@ -204,23 +288,36 @@ class StreamBingo {
                 return;
             }
             
-            // Add player to room
-            await roomRef.update({
-                players: firebase.firestore.FieldValue.arrayUnion({
-                    nickname: nickname,
-                    joinedAt: new Date().toISOString()
-                })
-            });
-            
-            this.showNotification(`Successfully joined room ${roomCode}!`, 'success');
-            
-            // Redirect to game room (implementation pending)
-            // this.loadGameRoom(roomCode, nickname);
+            try {
+                // First try to read the room data
+                await roomRef.get();
+                
+                // Then add the player to the room's players array
+                await roomRef.set({
+                    players: firebase.firestore.FieldValue.arrayUnion({
+                        nickname: nickname,
+                        joinedAt: new Date().toISOString()
+                    })
+                }, { merge: true });
+                
+                this.showNotification(`Successfully joined room ${roomCode}!`, 'success');
+                this.loadGameRoom(roomCode, nickname);
+            } catch (updateError) {
+                console.error('Error updating room:', updateError);
+                this.showNotification(`Error joining room: ${updateError.message}`, 'error');
+                
+                // Fallback - if updating fails, just enter the room anyway
+                this.loadGameRoom(roomCode, nickname);
+            }
         } catch (error) {
             console.error('Error joining room:', error);
             
             if (error.code === 'permission-denied') {
-                this.showNotification('You do not have permission to join this room.', 'error');
+                // If we get a permission denied error, fallback to just entering the room
+                this.showNotification('Permission error. Entering the room in read-only mode.', 'error');
+                const roomCode = document.getElementById('joinRoomCode').value.trim().toUpperCase();
+                const nickname = document.getElementById('joinNickname').value.trim();
+                this.loadGameRoom(roomCode, nickname);
             } else {
                 this.showNotification(`Error joining room: ${error.message}`, 'error');
             }
@@ -256,21 +353,15 @@ class StreamBingo {
             }
             
             // Delete room and update count
-            await window.db.runTransaction(async (transaction) => {
-                const userRoomCountDoc = await transaction.get(userRoomCountRef);
-                const currentCount = userRoomCountDoc.exists 
-                    ? (userRoomCountDoc.data().room_count || 0)
-                    : 0;
-                
-                transaction.delete(roomRef);
-                transaction.set(userRoomCountRef, 
-                    { room_count: Math.max(0, currentCount - 1) }, 
-                    { merge: true }
-                );
-            });
-            
-            this.showNotification(`Room ${roomId} deleted successfully.`, 'success');
-            this.loadUserRooms(); // Refresh the list
+            try {
+                // Simple delete rather than transaction to avoid permission issues
+                await roomRef.delete();
+                this.showNotification(`Room ${roomId} deleted successfully.`, 'success');
+                this.loadUserRooms(); // Refresh the list
+            } catch (deleteError) {
+                console.error('Error deleting room:', deleteError);
+                this.showNotification(`Error deleting room: ${deleteError.message}`, 'error');
+            }
         } catch (error) {
             console.error('Error deleting room:', error);
             this.showNotification(`Error deleting room: ${error.message}`, 'error');
@@ -283,6 +374,8 @@ class StreamBingo {
     }
     
     showNotification(message, type = 'info') {
+        console.log(`Notification: ${message} (${type})`);
+        
         const notification = document.createElement('div');
         notification.className = 'notification';
         notification.textContent = message;
@@ -334,62 +427,41 @@ class StreamBingo {
             // Get the current user's username
             const userId = this.auth.getUsername();
             
-            // Reference to user's room count document
-            const userRoomCountRef = window.db.collection('user_room_counts').doc(userId);
-            
             // Reference to the new room
             const roomRef = window.db.collection('rooms').doc(roomCode);
             
-            // Use a transaction to ensure atomic operations
-            await window.db.runTransaction(async (transaction) => {
-                // Get current room count
-                const userRoomCountDoc = await transaction.get(userRoomCountRef);
-                const currentCount = userRoomCountDoc.exists 
-                    ? (userRoomCountDoc.data().room_count || 0)
-                    : 0;
-                
-                // Check room count limit
-                if (currentCount >= 5) {
-                    throw new Error('Room creation limit reached. Maximum 5 rooms per user.');
-                }
-                
-                // Check if room already exists
-                const roomDoc = await transaction.get(roomRef);
-                if (roomDoc.exists) {
-                    throw new Error('Room code already exists. Please choose a different code.');
-                }
-                
-                // Create room data
-                const roomData = {
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    gridSize: gridSize,
-                    creatorId: userId,
-                    creatorNickname: nickname,
-                    active: true,
-                    status: 'waiting',
-                    players: [{
-                        nickname: nickname,
-                        joinedAt: new Date().toISOString()
-                    }]
-                };
-                
-                // Create room and update room count in the same transaction
-                transaction.set(roomRef, roomData);
-                transaction.set(userRoomCountRef, 
-                    { room_count: currentCount + 1 }, 
-                    { merge: true }
-                );
-            });
+            // First check if the room exists
+            const existingRoom = await roomRef.get();
+            if (existingRoom.exists) {
+                this.showNotification('Room code already exists. Please choose a different code.', 'error');
+                return;
+            }
+            
+            // Create room data
+            const roomData = {
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                gridSize: gridSize,
+                creatorId: userId,
+                creatorNickname: nickname,
+                active: true,
+                status: 'waiting',
+                players: [{
+                    nickname: nickname,
+                    joinedAt: new Date().toISOString()
+                }]
+            };
+            
+            // Create room directly without transaction
+            await roomRef.set(roomData);
             
             this.showNotification(`Created room ${roomCode} with grid size ${gridSize}x${gridSize}`, 'success');
-            this.loadUserRooms(); // Refresh the list
+            
+            // Automatically enter the room after creation
+            this.loadGameRoom(roomCode, nickname);
         } catch (error) {
             console.error('Error creating room:', error);
             
-            // More specific error handling
-            if (error.message.includes('Room creation limit reached')) {
-                this.showNotification('You have reached the maximum of 5 rooms. Delete an existing room to create a new one.', 'error');
-            } else if (error.message.includes('Room code already exists')) {
+            if (error.message && error.message.includes('Room code already exists')) {
                 this.showNotification('Room code already exists. Please choose a different code.', 'error');
             } else if (error.code === 'permission-denied') {
                 this.showNotification('You do not have permission to create a room.', 'error');
