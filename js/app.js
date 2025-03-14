@@ -80,7 +80,10 @@ class StreamBingo {
                 creatorNickname: nickname,
                 active: true,
                 status: 'waiting', // Add a status field
-                players: [] // Initialize empty players array
+                players: [{
+                    nickname: nickname,
+                    joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }] // Initialize with creator
             };
             
             // Use set with merge: false to ensure we don't accidentally overwrite
@@ -127,11 +130,11 @@ class StreamBingo {
             // Get room reference
             const roomRef = window.db.collection('rooms').doc(roomCode);
             
-            // Add player to the room
+            // Add player to the room using atomic update
             await roomRef.update({
                 players: firebase.firestore.FieldValue.arrayUnion({
                     nickname: nickname,
-                    joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    joinedAt: new Date() // Use standard Date instead of serverTimestamp()
                 })
             });
             
@@ -193,31 +196,37 @@ class StreamBingo {
     }
 
     showLoginScreen() {
-        // Your existing login screen implementation
         this.app.innerHTML = `
-            <div class="container">
-                <h1 class="title">Stream Bingo</h1>
-                <p class="subtitle">Create and play bingo during streams!</p>
+        <div class="container">
+            <h1 class="title">Stream Bingo</h1>
+            <p class="subtitle">Create and play bingo during streams!</p>
+            
+            <div class="login-box">
+                <button id="twitchLogin" class="btn btn-twitch">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                        <path d="M11.6461 4.50039H13.9461V9.10039H11.6461V4.50039Z" fill="white"/>
+                        <path d="M7.54614 4.50039H9.84614V9.10039H7.54614V4.50039Z" fill="white"/>
+                        <path d="M4.09238 1.20001L2.09238 5.20001V18.8H6.89238V22H9.69238L12.8924 18.8H16.9924L21.8924 13.9V1.20001H4.09238ZM19.9924 13L16.6924 16.3H11.6924L8.59238 19.4V16.3H4.49238V3.20001H19.9924V13Z" fill="white"/>
+                    </svg>
+                    Login with Twitch
+                </button>
                 
-                <div class="login-box">
-                    <button id="twitchLogin" class="btn btn-twitch">
-                        Login with Twitch
-                    </button>
-                    
-                    <div class="separator">
-                        <span>or</span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <input type="text" id="testUsername" class="form-control" placeholder="Enter test username">
-                    </div>
-                    
-                    <button id="testLogin" class="btn btn-secondary">
-                        Login for Testing
-                    </button>
+                <div class="separator">
+                    <span>or</span>
                 </div>
+                
+                <div class="form-group">
+                    <input type="text" id="testUsername" class="form-control" placeholder="Enter test username">
+                </div>
+                
+                <button id="testLogin" class="btn btn-secondary">
+                    Login for Testing
+                </button>
             </div>
-        `;
+            
+            <div id="loginStatus" style="margin-top: 20px; color: #ccc;"></div>
+        </div>
+    `;
 
         // Add event listeners
         document.getElementById('twitchLogin').addEventListener('click', () => {
@@ -235,89 +244,111 @@ class StreamBingo {
     }
 
     showDashboard() {
-        // Your existing dashboard implementation
         this.app.innerHTML = `
-            <div class="container">
-                <h1 class="title">Stream Bingo Dashboard</h1>
+        <div class="container">
+            <h1 class="title">Stream Bingo</h1>
+            
+            <div class="dashboard-options">
+                <div class="option-card">
+                    <h2>Create Room</h2>
+                    <p>Create a new bingo room for your stream</p>
+                    <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
+                </div>
                 
-                <div class="dashboard-options">
-                    <div class="option-card">
-                        <h2>Create Room</h2>
-                        <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
-                    </div>
-                    
-                    <div class="option-card">
-                        <h2>Join Room</h2>
-                        <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-                    </div>
+                <div class="option-card">
+                    <h2>Join Room</h2>
+                    <p>Join an existing bingo room</p>
+                    <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
+                </div>
+                
+                <div class="option-card">
+                    <h2>My Bingo Lists</h2>
+                    <p>Manage your saved bingo word lists</p>
+                    <button id="bingoListsBtn" class="btn btn-primary">Manage Lists</button>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
         // Add event listeners
         document.getElementById('createRoomBtn').addEventListener('click', () => this.showCreateRoomScreen());
         document.getElementById('joinRoomBtn').addEventListener('click', () => this.showJoinRoomScreen());
+        document.getElementById('bingoListsBtn').addEventListener('click', () => this.showBingoListsScreen());
     }
 
     showCreateRoomScreen() {
         this.app.innerHTML = `
-            <div class="container">
-                <h1 class="title">Create Room</h1>
+        <div class="container">
+            <h1 class="title">Create Room</h1>
+            
+            <div class="join-screen">
+                <div class="form-group">
+                    <label for="nickname">Your Nickname</label>
+                    <input type="text" id="nickname" class="form-control" placeholder="Enter your nickname">
+                </div>
                 
-                <div class="room-form">
-                    <div class="form-group">
-                        <label for="nickname">Your Nickname</label>
-                        <input type="text" id="nickname" class="form-control" placeholder="Enter your nickname">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="roomCode">Room Code</label>
-                        <input type="text" id="roomCode" class="form-control" placeholder="Enter a room code">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="gridSize">Grid Size</label>
-                        <select id="gridSize" class="form-control">
-                            <option value="3">3x3</option>
-                            <option value="4">4x4</option>
-                            <option value="5">5x5</option>
-                        </select>
-                    </div>
-                    
-                    <button id="createRoomSubmit" class="btn btn-primary">Create Room</button>
-                    <button id="backToDashboard" class="btn btn-secondary">Back to Dashboard</button>
+                <div class="form-group">
+                    <label for="roomCode">Room Code</label>
+                    <input type="text" id="roomCode" class="form-control" placeholder="Enter a room code">
+                </div>
+                
+                <div class="form-group">
+                    <label for="gridSize">Grid Size</label>
+                    <select id="gridSize" class="form-control">
+                        <option value="3">3x3</option>
+                        <option value="4">4x4</option>
+                        <option value="5">5x5</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <button id="create" class="btn btn-primary" style="width: 100%;">Create Room</button>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <button id="back" class="btn btn-secondary" style="width: 100%;">Back</button>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
-        document.getElementById('createRoomSubmit').addEventListener('click', () => this.createRoom());
-        document.getElementById('backToDashboard').addEventListener('click', () => this.showDashboard());
+        document.getElementById('back').addEventListener('click', () => this.showDashboard());
+        document.getElementById('create').addEventListener('click', () => this.createRoom());
     }
 
     showJoinRoomScreen() {
         this.app.innerHTML = `
-            <div class="container">
-                <h1 class="title">Join Room</h1>
+        <div class="container">
+            <h1 class="title">Join Room</h1>
+            
+            <div class="join-screen">
+                <div class="form-group">
+                    <label for="nickname">Your Nickname</label>
+                    <input type="text" id="nickname" class="form-control" placeholder="Enter your nickname">
+                </div>
                 
-                <div class="room-form">
-                    <div class="form-group">
-                        <label for="nickname">Your Nickname</label>
-                        <input type="text" id="nickname" class="form-control" placeholder="Enter your nickname">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="roomCode">Room Code</label>
-                        <input type="text" id="roomCode" class="form-control" placeholder="Enter the room code">
-                    </div>
-                    
-                    <button id="joinRoomSubmit" class="btn btn-primary">Join Room</button>
-                    <button id="backToDashboard" class="btn btn-secondary">Back to Dashboard</button>
+                <div class="form-group">
+                    <label for="roomCode">Room Code</label>
+                    <input type="text" id="roomCode" class="form-control" placeholder="Enter the room code">
+                </div>
+                
+                <div class="form-group">
+                    <button id="join" class="btn btn-primary" style="width: 100%;">Join Room</button>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <button id="back" class="btn btn-secondary" style="width: 100%;">Back</button>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
-        document.getElementById('joinRoomSubmit').addEventListener('click', () => this.handleJoinRoom());
-        document.getElementById('backToDashboard').addEventListener('click', () => this.showDashboard());
+        document.getElementById('back').addEventListener('click', () => this.showDashboard());
+        document.getElementById('join').addEventListener('click', () => this.handleJoinRoom());
+    }
+
+    showBingoListsScreen() {
+        this.showNotification('Bingo lists management coming soon!');
     }
 }
 
