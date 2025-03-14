@@ -171,10 +171,22 @@ class AdminController {
             const roomDoc = await roomRef.get();
             const roomData = roomDoc.data();
             
-            // If the game is already active, return success but with a helpful message
+            // If the game is already active, show a restart option
             if (roomData.status === 'active') {
-                window.showNotification('The game is already running. You can monitor players now.', 'info');
-                return true;
+                const confirmRestart = confirm("The game has already been started. Would you like to restart it (this will regenerate all player boards)?");
+                if (confirmRestart) {
+                    // Reset the game first
+                    await this.resetGame(roomId);
+                    
+                    window.showNotification('Game reset complete. Now restarting...', 'info');
+                    
+                    // Reload room data after reset
+                    const refreshedDoc = await roomRef.get();
+                    roomData = refreshedDoc.data();
+                } else {
+                    window.showNotification('The game is already running. You can monitor players now.', 'info');
+                    return true;
+                }
             }
             
             if ((roomData.words || []).length < roomData.gridSize * roomData.gridSize) {
@@ -196,6 +208,25 @@ class AdminController {
         } catch (error) {
             console.error('Error starting game:', error);
             window.showNotification(`Error starting game: ${error.message}`, 'error');
+            return false;
+        }
+    }
+    
+    async resetGame(roomId) {
+        try {
+            const roomRef = window.db.collection('rooms').doc(roomId);
+            await roomRef.set({
+                status: 'setup',
+                playerGrids: {}, // Clear all player grids
+                pendingApprovals: [], // Clear pending approvals
+                bingoWinners: [] // Clear winners
+            }, { merge: true });
+            
+            window.showNotification('Game reset to setup mode', 'success');
+            return true;
+        } catch (error) {
+            console.error('Error resetting game:', error);
+            window.showNotification(`Error resetting game: ${error.message}`, 'error');
             return false;
         }
     }
