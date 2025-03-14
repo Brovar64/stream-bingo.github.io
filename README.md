@@ -27,6 +27,42 @@ An interactive bingo game for streamers and their audience. Streamers can create
 3. Play bingo by marking items as they occur during the stream
 4. Wait for admin confirmation of your marked items
 
+## Setup and Configuration
+
+### Firebase Setup
+
+This application requires Firebase for authentication and database functionality. Follow these steps to set it up:
+
+1. Create a Firebase project at [firebase.google.com](https://firebase.google.com)
+2. Enable Firestore Database and Authentication in your Firebase project
+3. Create a file named `firebase-config.json` in the root directory with your Firebase credentials:
+
+```json
+{
+  "apiKey": "YOUR_API_KEY",
+  "authDomain": "YOUR_PROJECT_ID.firebaseapp.com",
+  "projectId": "YOUR_PROJECT_ID",
+  "storageBucket": "YOUR_PROJECT_ID.appspot.com",
+  "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
+  "appId": "YOUR_APP_ID",
+  "measurementId": "YOUR_MEASUREMENT_ID"
+}
+```
+
+4. Add this file to your `.gitignore` if you're pushing to a public repository to keep your keys private
+
+### Security Rules
+
+For proper Firebase security, add the security rules from the `firebase-security-rules.md` file to your Firebase project's security rules.
+
+## Local Development
+
+To run the project locally:
+
+1. Clone the repository
+2. Create the `firebase-config.json` file with your credentials
+3. Open `index.html` in your browser or use a local server
+
 ## Technologies Used
 
 - HTML, CSS, JavaScript
