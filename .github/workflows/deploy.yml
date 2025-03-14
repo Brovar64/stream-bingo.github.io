@@ -33,6 +33,12 @@ jobs:
             }
           };" > js/config.js
       
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: site-files
+          path: .
+      
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
