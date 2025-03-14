@@ -4,25 +4,24 @@ class AuthManager {
         this.currentUser = null;
         this.TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
         
-        // Use the window.location to dynamically determine the current origin
-        const baseUrl = window.location.origin;
+        // Make sure this exactly matches one of your configured redirect URLs
+        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:8080'
+            : 'https://brovar64.github.io/stream-bingo';
+            
+        // Use index.html as the redirect URI since that's what's configured in Twitch
+        this.REDIRECT_URI = `${baseUrl}/index.html`;
         
-        // Use our simple redirect handler
-        this.REDIRECT_URI = `${baseUrl}/twitch-redirect.html`;
-        
-        console.log('=== TWITCH AUTH DETAILS ===');
-        console.log('Base URL:', baseUrl);
-        console.log('Redirect URI:', this.REDIRECT_URI);
-        console.log('Protocol:', window.location.protocol);
-        console.log('Hostname:', window.location.hostname);
-        console.log('Port:', window.location.port);
+        // Log the redirect URI to make it very clear what we're using
+        console.log('=== TWITCH REDIRECT URI ===');
+        console.log(this.REDIRECT_URI);
         console.log('==========================');
         
-        // Check for stored Twitch token
-        this.checkTwitchToken();
-        
+        // Check for existing login
+        const isHandlingCallback = this.checkForAuthCallback();
+
         // Only try to load from storage if we're not handling a callback
-        if (this.isLoggedIn() === false) {
+        if (!isHandlingCallback) {
             this.loadUserFromStorage();
         }
     }
@@ -50,7 +49,6 @@ class AuthManager {
 
     clearUserFromStorage() {
         localStorage.removeItem('streamBingoUser');
-        localStorage.removeItem('twitchAccessToken');
         this.currentUser = null;
         console.log('User cleared from storage');
     }
@@ -71,32 +69,6 @@ class AuthManager {
         return this.currentUser && this.currentUser.profileImage ? this.currentUser.profileImage : null;
     }
 
-    // Check if we have a Twitch token stored from the redirect page
-    checkTwitchToken() {
-        const token = localStorage.getItem('twitchAccessToken');
-        if (token) {
-            console.log('Found Twitch access token in storage, fetching user data...');
-            
-            // Process the token and fetch user info
-            this.handleTwitchCallback(token)
-                .then(() => {
-                    console.log('Successfully processed stored Twitch token');
-                    // Remove the token now that we've processed it
-                    localStorage.removeItem('twitchAccessToken');
-                    
-                    // Redirect to dashboard if needed
-                    if (window.streamBingo && window.streamBingo.showDashboard) {
-                        console.log('Showing dashboard after token processing');
-                        window.streamBingo.showDashboard();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error processing stored token:', error);
-                    localStorage.removeItem('twitchAccessToken');
-                });
-        }
-    }
-
     // Initiate Twitch login
     loginWithTwitch() {
         console.log('Initiating Twitch login...');
@@ -106,10 +78,73 @@ class AuthManager {
         
         const scopes = 'user:read:email';
         const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${this.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&response_type=token&scope=${scopes}`;
-        console.log('Full auth URL:', authUrl);
+        console.log('Redirecting to:', authUrl);
         
         // Navigate to Twitch for authentication
         window.location.href = authUrl;
+    }
+
+    checkForAuthCallback() {
+        console.log("Checking for auth callback...");
+        const hash = window.location.hash.substring(1);
+
+        if (hash && hash.includes('access_token=')) {
+            console.log("Found access token in URL");
+            // Parse the hash fragment to get the token
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+
+            if (accessToken) {
+                console.log("Processing Twitch access token");
+                // Remove the hash from URL to avoid issues on reload
+                history.replaceState(null, null, window.location.pathname);
+
+                // Show a loading indicator
+                document.getElementById('app').innerHTML = `
+                <div style="text-align: center; margin-top: 100px;">
+                    <h2>Authenticating...</h2>
+                    <p>Please wait while we complete your login.</p>
+                </div>
+            `;
+
+                // Process the token and fetch user info
+                this.handleTwitchCallback(accessToken)
+                    .then(() => {
+                        console.log("Successfully authenticated with Twitch!");
+                        // Ensure streamBingo is initialized properly
+                        if (window.streamBingo) {
+                            // Force a dashboard display after authentication
+                            console.log('Showing dashboard via streamBingo object');
+                            if (window.streamBingo.showDashboard) {
+                                window.streamBingo.showDashboard();
+                            } else {
+                                window.streamBingo.init();
+                            }
+                        } else {
+                            // If streamBingo object isn't available yet, create a flag to show dashboard
+                            console.log('Setting flag to show dashboard after load');
+                            window.showDashboardAfterLoad = true;
+                            // Reload as fallback
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Authentication error:', error);
+                        document.getElementById('app').innerHTML = `
+                        <div style="text-align: center; margin-top: 100px;">
+                            <h2>Authentication Error</h2>
+                            <p>There was a problem logging in with Twitch.</p>
+                            <p>Error details: ${error.message || 'Unknown error'}</p>
+                            <button onclick="window.location.reload()">Try Again</button>
+                        </div>
+                    `;
+                    });
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Handle Twitch authentication response
