@@ -12,6 +12,8 @@ function initializeFirebase() {
             measurementId: "G-1DYM2MTE10"
         };
         
+        console.log('Initializing Firebase with project ID:', firebaseConfig.projectId);
+        
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         
@@ -20,7 +22,7 @@ function initializeFirebase() {
         window.auth = firebase.auth();
         firebase.analytics();
         
-        console.log('Firebase initialized for production');
+        console.log('Firebase initialized successfully');
     } catch (error) {
         console.error('Firebase initialization error:', error);
     }

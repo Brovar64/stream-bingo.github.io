@@ -9,7 +9,7 @@ class AuthManager {
             : 'https://brovar64.github.io/stream-bingo.github.io';
             
         // Use index.html as the redirect URI
-        this.REDIRECT_URI = `${baseUrl}/index.html`;
+        this.REDIRECT_URI = "https://brovar64.github.io/stream-bingo/twitch-callback.html" || `${baseUrl}/index.html`;
         
         console.log('Auth Manager initialized');
         console.log('Redirect URI:', this.REDIRECT_URI);
@@ -80,7 +80,7 @@ class AuthManager {
         // In a production app, you should use a proper OAuth flow with state parameter
         // This is a simplified example for demonstration purposes
         const scope = 'user:read:email';
-        const clientId = '{{TWITCH_CLIENT_ID}}'; // Will be replaced by GitHub Actions
+        const clientId = "k53e9s8oc2leprhcgyoa010e38bm6s";
         
         const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&response_type=token&scope=${scope}`;
         
