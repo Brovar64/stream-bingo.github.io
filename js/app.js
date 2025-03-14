@@ -1,31 +1,57 @@
-// Stream Bingo App - Version 2.1
+// Stream Bingo App - Version 3.0 - Emergency Fix
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Document loaded, initializing app...');
-    try {
-        // Show loading state
-        document.getElementById('app').innerHTML = `
-            <div style="text-align: center; margin-top: 100px;">
-                <h2>Loading Stream Bingo...</h2>
-                <p>Please wait while the application initializes.</p>
-            </div>
-        `;
-        
-        // Initialize app
-        const app = new StreamBingo();
-        window.streamBingo = app;
-        app.init();
-        
-    } catch (err) {
-        console.error('Critical error during app startup:', err);
-        document.getElementById('app').innerHTML = `
-            <div style="text-align: center; margin-top: 100px;">
-                <h2>Application Error</h2>
-                <p>There was a critical problem starting the application.</p>
-                <p style="color: #ff6b6b;">Error: ${err.message || 'Unknown error'}</p>
-                <button onclick="window.location.reload()" style="padding: 10px 20px; background: #ff4081; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Reload App</button>
-            </div>
-        `;
-    }
+    
+    // Add small delay to ensure Firebase is initialized
+    setTimeout(() => {
+        try {
+            // Show loading state
+            document.getElementById('app').innerHTML = `
+                <div style="text-align: center; margin-top: 100px;">
+                    <h2>Loading Stream Bingo...</h2>
+                    <p>Please wait while the application initializes.</p>
+                </div>
+            `;
+            
+            // Verify Firebase is available
+            if (!window.firebase) {
+                throw new Error('Firebase SDK not loaded');
+            }
+            
+            // Verify Firestore is available
+            if (!window.db) {
+                console.log('Firestore not initialized yet, attempting to initialize...');
+                if (window.firebase && window.firebase.firestore) {
+                    window.db = window.firebase.firestore();
+                    console.log('Firestore initialized');
+                } else {
+                    throw new Error('Firestore SDK not available');
+                }
+            }
+            
+            // Initialize app
+            const app = new StreamBingo();
+            window.streamBingo = app;
+            app.init();
+            
+        } catch (err) {
+            console.error('Critical error during app startup:', err);
+            document.getElementById('app').innerHTML = `
+                <div style="text-align: center; margin-top: 100px;">
+                    <h2>Application Error</h2>
+                    <p>There was a critical problem starting the application.</p>
+                    <p style="color: #ff6b6b;">Error: ${err.message || 'Unknown error'}</p>
+                    <p style="margin-top: 15px;">Please try the following:</p>
+                    <ul style="text-align: left; max-width: 400px; margin: 0 auto; padding-left: 30px;">
+                        <li>Refresh the page (sometimes it helps)</li>
+                        <li>Clear your browser cache</li>
+                        <li>Try using a different browser</li>
+                    </ul>
+                    <button onclick="window.location.reload()" style="padding: 10px 20px; background: #ff4081; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Reload App</button>
+                </div>
+            `;
+        }
+    }, 500); // Small delay to ensure Firebase is loaded
 });
 
 class StreamBingo {
@@ -52,13 +78,6 @@ class StreamBingo {
     init() {
         console.log('Initializing StreamBingo app...');
         console.log('Auth manager available:', !!this.auth);
-        
-        // Initialize Firestore if needed
-        if (!window.db && window.firebase && window.firebase.firestore) {
-            console.log('Setting up Firestore manually...');
-            window.db = window.firebase.firestore();
-        }
-        
         console.log('Firestore available:', !!window.db);
         
         if (this.auth) {
@@ -316,11 +335,6 @@ class StreamBingo {
     async checkRoomExists(roomCode) {
         try {
             // Check if Firestore is available
-            if (!window.db && window.firebase && window.firebase.firestore) {
-                console.log('Setting up Firestore before checking room...');
-                window.db = window.firebase.firestore();
-            }
-            
             if (!window.db) {
                 console.error('Firestore is not available');
                 this.showNotification('Database connection not available');
@@ -438,12 +452,6 @@ class StreamBingo {
                 return;
             }
             
-            // Set up Firestore if needed
-            if (!window.db && window.firebase && window.firebase.firestore) {
-                console.log('Setting up Firestore before joining room...');
-                window.db = window.firebase.firestore();
-            }
-            
             if (!window.db) {
                 this.showNotification('Database connection not available');
                 return;
@@ -478,12 +486,6 @@ class StreamBingo {
             if (!nickname || !roomCode) {
                 this.showNotification('Please enter both nickname and room code');
                 return;
-            }
-            
-            // Set up Firestore if needed
-            if (!window.db && window.firebase && window.firebase.firestore) {
-                console.log('Setting up Firestore before creating room...');
-                window.db = window.firebase.firestore();
             }
             
             if (!window.db) {
