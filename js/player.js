@@ -1,69 +1,67 @@
-// js/player.js - Player functionality for joining and playing bingo
+// js/player.js - Player functionality for joining rooms and marking bingo cells
 
 class PlayerController {
     constructor() {
-        this.playerListener = null;
+        this.roomListener = null;
     }
     
     async joinRoom(nickname, roomCode) {
         try {
-            if (!nickname || !roomCode) {
-                window.showNotification('Please enter both your nickname and the room code');
+            if (!nickname) {
+                window.showNotification('Please enter your nickname', 'error');
+                return null;
+            }
+            
+            if (!roomCode) {
+                window.showNotification('Please enter a room code', 'error');
                 return null;
             }
             
             if (!window.db) {
-                window.showNotification('Database connection not available');
+                window.showNotification('Database connection not available', 'error');
                 return null;
             }
+            
+            // Get room reference
+            const roomRef = window.db.collection('rooms').doc(roomCode);
             
             // Check if room exists
-            const roomRef = window.db.collection('rooms').doc(roomCode);
             const roomDoc = await roomRef.get();
-            
             if (!roomDoc.exists) {
-                window.showNotification('Room not found. Please check the room code and try again.', 'error');
+                window.showNotification(`Room ${roomCode} not found`, 'error');
                 return null;
             }
             
+            // Get room data
             const roomData = roomDoc.data();
             
-            if (roomData.status === 'closed') {
-                window.showNotification('This room is closed and not accepting new players.', 'error');
+            // Check if room is active
+            if (!roomData.active) {
+                window.showNotification('This room is no longer active', 'error');
                 return null;
             }
             
-            // Check if nickname is already taken in this room
-            const existingPlayer = (roomData.players || []).find(p => p.nickname === nickname);
-            if (existingPlayer) {
-                // If player already exists, just return the room data
-                return roomData;
+            // Add player to the room if not already present
+            const playerExists = (roomData.players || []).some(player => player.nickname === nickname);
+            
+            if (!playerExists) {
+                // Create player data
+                const playerData = {
+                    nickname: nickname,
+                    joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Add to players array
+                const players = [...(roomData.players || []), playerData];
+                
+                // Update room
+                await roomRef.set({ players }, { merge: true });
+                window.showNotification(`Joined room ${roomCode} as ${nickname}`, 'success');
+            } else {
+                window.showNotification(`Resumed session in room ${roomCode} as ${nickname}`, 'success');
             }
             
-            try {
-                // Add player to room
-                const players = [...(roomData.players || [])];
-                players.push({
-                    nickname: nickname,
-                    joinedAt: new Date().toISOString()
-                });
-                
-                await roomRef.set({
-                    players: players
-                }, { merge: true });
-                
-                window.showNotification(`Successfully joined room ${roomCode}!`, 'success');
-                
-                // Refresh room data
-                const updatedRoomDoc = await roomRef.get();
-                return updatedRoomDoc.data();
-            } catch (error) {
-                console.error('Error joining room:', error);
-                window.showNotification(`Error joining room: ${error.message}`, 'error');
-                
-                // If failed to update, still return original room data so player can view
-                return roomData;
-            }
+            return roomData;
         } catch (error) {
             console.error('Error joining room:', error);
             window.showNotification(`Error joining room: ${error.message}`, 'error');
@@ -71,83 +69,104 @@ class PlayerController {
         }
     }
     
-    setupPlayerListener(roomId, playerName, callbackFunction) {
-        const roomRef = window.db.collection('rooms').doc(roomId);
-        
-        // Unsubscribe from previous listener if exists
-        if (this.playerListener) {
-            this.playerListener();
+    setupRoomListener(roomId, callbackFunction) {
+        // Clean up previous listener if exists
+        if (this.roomListener) {
+            this.roomListener();
         }
         
         // Set up new listener
-        this.playerListener = roomRef.onSnapshot(doc => {
+        const roomRef = window.db.collection('rooms').doc(roomId);
+        this.roomListener = roomRef.onSnapshot(doc => {
             if (doc.exists) {
                 const roomData = doc.data();
                 callbackFunction(roomData);
             }
         }, error => {
-            console.error('Error in player listener:', error);
+            console.error('Error in room listener:', error);
         });
         
-        return this.playerListener;
+        return this.roomListener;
     }
     
-    async markPlayerCell(roomId, playerName, row, col) {
+    async markCell(roomId, playerName, row, col) {
         try {
             const roomRef = window.db.collection('rooms').doc(roomId);
             const roomDoc = await roomRef.get();
+            
+            if (!roomDoc.exists) {
+                window.showNotification('Room not found', 'error');
+                return false;
+            }
+            
             const roomData = roomDoc.data();
             
-            const cellKey = `${row}_${col}`;
+            // Check if the game is in active status
+            if (roomData.status !== 'active') {
+                window.showNotification('Cannot mark cells - game is not active', 'error');
+                return false;
+            }
             
+            // Check if player exists in the room
+            const playerExists = (roomData.players || []).some(player => player.nickname === playerName);
+            if (!playerExists) {
+                window.showNotification('You are not registered in this room', 'error');
+                return false;
+            }
+            
+            // Check if player's grid exists
             if (!roomData.playerGrids || !roomData.playerGrids[playerName]) {
-                window.showNotification('Your grid data is not available', 'error');
+                window.showNotification('Your bingo grid is not ready yet', 'error');
                 return false;
             }
             
-            const playerGrid = roomData.playerGrids[playerName];
-            if (!playerGrid[cellKey]) {
-                window.showNotification('Invalid cell coordinates', 'error');
+            // Get the cell in question
+            const cellKey = `${row}_${col}`;
+            const grid = roomData.playerGrids[playerName];
+            
+            if (!grid[cellKey]) {
+                window.showNotification('Invalid cell selection', 'error');
                 return false;
             }
             
-            // If cell is already marked or approved, do nothing
-            if (playerGrid[cellKey].marked || playerGrid[cellKey].approved) {
+            // If cell is already marked, don't allow changing
+            if (grid[cellKey].marked) {
+                window.showNotification('This cell is already marked', 'info');
                 return false;
             }
             
-            // Create a deep copy of player grids
+            // Create a copy of player grids to update
             const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids));
             
-            // Mark the cell as pending approval
+            // Update the cell as marked but pending approval
             playerGrids[playerName][cellKey].marked = true;
             
-            // Add to pending approvals
+            // Create approval request for admin
             const pendingApprovals = [...(roomData.pendingApprovals || [])];
-            pendingApprovals.push({
-                playerName,
-                row,
-                col,
-                word: playerGrid[cellKey].word,
-                timestamp: new Date().toISOString()
-            });
             
-            // Update room
-            try {
-                await roomRef.set({
-                    playerGrids: playerGrids,
-                    pendingApprovals: pendingApprovals
-                }, { merge: true });
-                
-                window.showNotification('Marked cell, waiting for admin approval', 'success');
-                return true;
-            } catch (error) {
-                console.error('Error updating room:', error);
-                window.showNotification(`Error marking cell: ${error.message}`, 'error');
-                
-                // Even if the update fails, reflect the change in the UI for the player
-                return true;
+            // Check if approval already exists
+            const approvalExists = pendingApprovals.some(
+                approval => approval.playerName === playerName && approval.row === row && approval.col === col
+            );
+            
+            if (!approvalExists) {
+                pendingApprovals.push({
+                    playerName: playerName,
+                    row: row,
+                    col: col,
+                    word: grid[cellKey].word,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
             }
+            
+            // Update room data
+            await roomRef.set({
+                playerGrids: playerGrids,
+                pendingApprovals: pendingApprovals
+            }, { merge: true });
+            
+            window.showNotification('Cell marked! Waiting for admin approval.', 'success');
+            return true;
         } catch (error) {
             console.error('Error marking cell:', error);
             window.showNotification(`Error marking cell: ${error.message}`, 'error');
