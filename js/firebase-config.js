@@ -1,19 +1,16 @@
-// Firebase Configuration
-// IMPORTANT: Replace these placeholder values with your actual Firebase project values
-function initializeFirebase() {
+// Secure Firebase Configuration Loader
+async function initializeFirebase() {
     try {
-        // Firebase configuration - REPLACE THESE VALUES with your actual Firebase project values
-        const firebaseConfig = {
-            apiKey: "AIzaSyDOCAbC123dEf456GhI789jKl01-MnO",  // REPLACE THIS
-            authDomain: "demo-project.firebaseapp.com",       // REPLACE THIS
-            projectId: "demo-project",                        // REPLACE THIS
-            storageBucket: "demo-project.appspot.com",        // REPLACE THIS
-            messagingSenderId: "123456789012",               // REPLACE THIS
-            appId: "1:123456789012:web:f9e5efa56c5f5bdf",    // REPLACE THIS
-            measurementId: "G-ABCDEF1234"                     // REPLACE THIS
-        };
+        // Load Firebase configuration from the JSON file created by GitHub Actions
+        const response = await fetch('/firebase-config.json');
+        if (!response.ok) {
+            console.warn('Failed to load Firebase configuration from JSON file. The app might not work correctly.');
+            console.warn('Make sure your GitHub Actions workflow is running correctly.');
+            return;
+        }
         
-        console.log('Attempting Firebase initialization...');
+        const firebaseConfig = await response.json();
+        console.log('Firebase configuration loaded successfully');
         
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -26,6 +23,7 @@ function initializeFirebase() {
         console.log('Firebase initialized successfully');
     } catch (error) {
         console.error('Firebase initialization error:', error);
+        console.error('The app will not function correctly without proper Firebase configuration.');
     }
 }
 
