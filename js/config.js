@@ -1,16 +1,16 @@
 // Placeholder configuration to be replaced during deployment
 var CONFIG = {
   FIREBASE: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: '',
-    measurementId: ''
+    apiKey: 'FIREBASE_API_KEY_PLACEHOLDER',
+    authDomain: 'FIREBASE_AUTH_DOMAIN_PLACEHOLDER',
+    projectId: 'FIREBASE_PROJECT_ID_PLACEHOLDER',
+    storageBucket: 'FIREBASE_STORAGE_BUCKET_PLACEHOLDER',
+    messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID_PLACEHOLDER',
+    appId: 'FIREBASE_APP_ID_PLACEHOLDER',
+    measurementId: 'FIREBASE_MEASUREMENT_ID_PLACEHOLDER'
   },
   TWITCH: {
-    CLIENT_ID: '',
-    REDIRECT_URI: ''
+    CLIENT_ID: 'TWITCH_CLIENT_ID_PLACEHOLDER',
+    REDIRECT_URI: 'TWITCH_REDIRECT_URI_PLACEHOLDER'
   }
 };
