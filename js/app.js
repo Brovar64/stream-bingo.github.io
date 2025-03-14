@@ -418,7 +418,40 @@ class StreamBingo {
         `;
 
         document.getElementById('back').addEventListener('click', () => this.showWelcomeScreen());
-        document.getElementById('join').addEventListener('click', () => this.joinRoom());
+        document.getElementById('join').addEventListener('click', () => this.handleJoinRoom());
+    }
+    
+    // Added the missing joinRoom function (renamed to handleJoinRoom to be clear)
+    async handleJoinRoom() {
+        const nickname = document.getElementById('nickname').value.trim();
+        const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+        
+        if (!nickname || !roomCode) {
+            this.showNotification('Please enter both nickname and room code');
+            return;
+        }
+        
+        // Check if the room exists
+        const roomExists = await this.checkRoomExists(roomCode);
+        
+        if (!roomExists) {
+            this.showNotification('Room not found. Please check the room code.');
+            return;
+        }
+        
+        // Add player to the room
+        try {
+            // TODO: Add Firebase logic to join the room
+            
+            // For now, just show a notification
+            this.showNotification(`Joined room ${roomCode} as ${nickname}`);
+            
+            // Show the game screen
+            // this.showGameScreen(roomCode, nickname, false);
+        } catch (error) {
+            console.error('Error joining room:', error);
+            this.showNotification('Error joining room. Please try again.');
+        }
     }
 
     // Rest of methods would go here, keeping the existing implementation

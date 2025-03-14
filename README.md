@@ -27,9 +27,39 @@ An interactive bingo game for streamers and their audience. Streamers can create
 3. Play bingo by marking items as they occur during the stream
 4. Wait for admin confirmation of your marked items
 
+## Production Setup
+
+### Firebase Setup and Deployment
+
+The app uses GitHub Actions to securely deploy your Firebase configuration to GitHub Pages.
+
+1. **Firebase Setup**:
+   - Create a Firebase project at [firebase.google.com](https://firebase.google.com)
+   - Enable Firestore Database and Authentication
+   - Get your Firebase configuration values
+
+2. **GitHub Secrets**:
+   - The following GitHub secrets should be set up in your repository:
+   - `FIREBASE_API_KEY`
+   - `FIREBASE_AUTH_DOMAIN`
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_STORAGE_BUCKET`
+   - `FIREBASE_MESSAGING_SENDER_ID`
+   - `FIREBASE_APP_ID`
+   - `FIREBASE_MEASUREMENT_ID`
+
+3. **Deployment**:
+   - After updating any GitHub secrets, manually trigger the "Build and Deploy" GitHub Action in the Actions tab
+   - This will securely deploy your app with the Firebase configuration
+
+### Security Rules
+
+Set up your Firebase security rules as specified in the `firebase-security-rules.md` file in your Firebase project.
+
 ## Technologies Used
 
 - HTML, CSS, JavaScript
 - Firebase Firestore (realtime database)
 - Firebase Authentication
 - GitHub Pages
+- GitHub Actions (for secure deployment)

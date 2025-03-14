@@ -1,15 +1,16 @@
-const CONFIG = {
+// Placeholder configuration to be replaced during deployment
+var CONFIG = {
   FIREBASE: {
-    apiKey: 'AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU',
-    authDomain: 'stream-bingo-ecb40.firebaseapp.com',
-    projectId: 'stream-bingo-ecb40',
-    storageBucket: 'stream-bingo-ecb40.appspot.com',
-    messagingSenderId: '814141306111',
-    appId: '1:814141306111:web:319ac02de11210186408ca',
-    measurementId: 'G-1DYM2MTE10'
+    apiKey: 'FIREBASE_API_KEY_PLACEHOLDER',
+    authDomain: 'FIREBASE_AUTH_DOMAIN_PLACEHOLDER',
+    projectId: 'FIREBASE_PROJECT_ID_PLACEHOLDER',
+    storageBucket: 'FIREBASE_STORAGE_BUCKET_PLACEHOLDER',
+    messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID_PLACEHOLDER',
+    appId: 'FIREBASE_APP_ID_PLACEHOLDER',
+    measurementId: 'FIREBASE_MEASUREMENT_ID_PLACEHOLDER'
   },
   TWITCH: {
-    CLIENT_ID: 'k53e9s8oc2leprhcgyoa010e38bm6s',
-    REDIRECT_URI: 'https://brovar64.github.io/stream-bingo/twitch-callback.html'
+    CLIENT_ID: 'TWITCH_CLIENT_ID_PLACEHOLDER',
+    REDIRECT_URI: 'TWITCH_REDIRECT_URI_PLACEHOLDER'
   }
 };
