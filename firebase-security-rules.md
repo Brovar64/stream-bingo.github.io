@@ -30,10 +30,9 @@ service cloud.firestore {
                     && request.resource.data.gridSize >= 3 
                     && request.resource.data.gridSize <= 5;
       
-      // Update rules: Only creator or players can modify
+      // Update rules: Only creator can modify
       allow update: if request.auth != null 
-                    && (resource.data.creatorId == request.auth.uid 
-                        || resource.data.players.map(p => p.nickname).hasAny([request.auth.uid]));
+                    && resource.data.creatorId == request.auth.uid;
     }
   }
 }
