@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authenticating...</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container" style="text-align: center; margin-top: 100px;">
+        <h2>Authenticating with Twitch...</h2>
+        <p>Please wait, you will be redirected shortly.</p>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Parse the access token from the URL hash
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            
+            if (accessToken) {
+                // Complete authentication and redirect
+                window.authManager.handleTwitchCallback(accessToken)
+                    .then(() => {
+                        window.location.href = 'index.html';
+                    })
+                    .catch(error => {
+                        console.error('Authentication error:', error);
+                        document.body.innerHTML = `
+                            <div class="container" style="text-align: center; margin-top: 100px;">
+                                <h2>Authentication failed</h2>
+                                <p>There was an error authenticating with Twitch.</p>
+                                <a href="index.html" class="btn btn-primary">Return to homepage</a>
+                            </div>
+                        `;
+                    });
+            } else {
+                // No access token found, go back to main page
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>

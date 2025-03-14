@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Bingo - Twitch Authentication</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #121212;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .auth-container {
+            background-color: #1E1E1E;
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #FF4081;
+        }
+        
+        p {
+            margin-bottom: 1.5rem;
+            color: #B0BEC5;
+        }
+        
+        .status {
+            padding: 1rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            background-color: #333;
+            font-family: monospace;
+            text-align: left;
+            overflow-wrap: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            color: #5CFF9D;
+        }
+        
+        .error {
+            color: #FF5C5C;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #FF4081;
+            color: white;
+            display: inline-block;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background-color: #F50057;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 64, 129, 0.4);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 64, 129, 0.3);
+            border-radius: 50%;
+            border-top-color: #FF4081;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .debug-info {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #999;
+            text-align: left;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+        }
+        
+        .debug-info h3 {
+            margin-top: 0;
+            color: #ccc;
+            font-size: 1rem;
+        }
+        
+        .debug-info p {
+            margin: 5px 0;
+            color: #aaa;
+        }
+        
+        .debug-info .value {
+            color: #fff;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container" id="authContainer">
+        <h1>Twitch Authentication</h1>
+        <p>Processing your Twitch login...</p>
+        <div class="loading" id="loadingSpinner"></div>
+        <div class="status" id="statusMessages">
+            Initializing authentication process...
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        // Utility functions
+        function log(message, isError = false) {
+            const statusDiv = document.getElementById('statusMessages');
+            const messageElement = document.createElement('div');
+            messageElement.textContent = message;
+            
+            if (isError) {
+                messageElement.classList.add('error');
+            }
+            
+            statusDiv.appendChild(messageElement);
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+            
+            console.log(isError ? `[ERROR] ${message}` : message);
+        }
+        
+        function showSuccess(message) {
+            const container = document.getElementById('authContainer');
+            container.innerHTML = `
+                <h1>Authentication Successful!</h1>
+                <p>${message}</p>
+                <div class="status success">
+                    Login completed successfully. You can now use Stream Bingo!
+                </div>
+                <a href="index.html" class="btn">Go to Dashboard</a>
+            `;
+        }
+        
+        function showError(message, error, showDebugInfo = true) {
+            const container = document.getElementById('authContainer');
+            const errorDetails = error ? `<br>Error details: ${error.message || 'Unknown error'}` : '';
+            
+            let html = `
+                <h1>Authentication Failed</h1>
+                <p>${message}</p>
+                <div class="status error">
+                    There was a problem completing the authentication.${errorDetails}
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                    <a href="index.html" class="btn">Return to Login</a>
+                    <a href="debug.html" class="btn" style="background-color: #333;">Debug Tools</a>
+                </div>
+            `;
+            
+            if (showDebugInfo) {
+                const clientId = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+                const hostname = window.location.hostname;
+                const expectedRedirectUri = (hostname === 'localhost' || hostname === '127.0.0.1') 
+                    ? 'http://localhost:8080/twitch-callback.html'
+                    : 'https://brovar64.github.io/stream-bingo/twitch-callback.html';
+                
+                html += `
+                    <div class="debug-info">
+                        <h3>Troubleshooting Information</h3>
+                        <p>Client ID: <span class="value">${clientId}</span></p>
+                        <p>Expected Redirect URI: <span class="value">${expectedRedirectUri}</span></p>
+                        <p>Actual URL: <span class="value">${window.location.href}</span></p>
+                        <p>Please ensure this exact redirect URI is registered in your Twitch Developer Console.</p>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            
+            if (error) {
+                console.error('Authentication error:', error);
+            }
+        }
+        
+        // Main authentication handling
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Page loaded, checking for auth token...');
+            
+            const TWITCH_CLIENT_ID = 'k53e9s8oc2leprhcgyoa010e38bm6s';
+            
+            // Check for error parameters first
+            const queryParams = new URLSearchParams(window.location.search);
+            if (queryParams.has('error')) {
+                const error = queryParams.get('error');
+                const errorDescription = queryParams.get('error_description');
+                
+                log(`Error detected: ${error} - ${errorDescription}`, true);
+                
+                if (error === 'redirect_mismatch') {
+                    showError('Redirect URI Mismatch Error', {
+                        message: 'The redirect URI in your request does not match the one registered in your Twitch Developer Console. ' +
+                        'Please update your Twitch Developer Console to include the exact redirect URI shown below.'
+                    });
+                    return;
+                } else {
+                    showError(`Twitch Authentication Error: ${error}`, {
+                        message: errorDescription || 'No error description provided'
+                    });
+                    return;
+                }
+            }
+            
+            // Extract the access token from the URL hash
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            
+            if (accessToken) {
+                log(`Access token found: ${accessToken.substring(0, 8)}...`);
+                
+                // Remove the hash from URL to avoid issues on reload
+                history.replaceState(null, null, window.location.pathname);
+                
+                // Fetch user data from Twitch API
+                log('Fetching user data from Twitch API...');
+                
+                fetch('https://api.twitch.tv/helix/users', {
+                    headers: {
+                        'Client-ID': TWITCH_CLIENT_ID,
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                })
+                .then(response => {
+                    log(`API response received, status: ${response.status}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Twitch API error: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    log('User data retrieved successfully');
+                    
+                    if (data.data && data.data.length > 0) {
+                        const userData = data.data[0];
+                        log(`Logged in as: ${userData.display_name}`);
+                        
+                        const user = {
+                            provider: 'twitch',
+                            id: userData.id,
+                            username: userData.login,
+                            displayName: userData.display_name,
+                            profileImage: userData.profile_image_url,
+                            accessToken: accessToken
+                        };
+                        
+                        // Save to localStorage
+                        log('Saving user data to localStorage...');
+                        localStorage.setItem('streamBingoUser', JSON.stringify(user));
+                        
+                        // Show success message
+                        showSuccess(`Welcome, ${userData.display_name}!`);
+                    } else {
+                        throw new Error('No user data received from Twitch');
+                    }
+                })
+                .catch(error => {
+                    log(`Authentication error: ${error.message}`, true);
+                    showError('Failed to authenticate with Twitch', error);
+                });
+            } else {
+                log('No access token found in URL', true);
+                showError('No authentication token was found in the URL.');
+            }
+        });
+    </script>
+</body>
+</html>
