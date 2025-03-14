@@ -171,9 +171,10 @@ class AdminController {
             const roomDoc = await roomRef.get();
             const roomData = roomDoc.data();
             
+            // If the game is already active, return success but with a helpful message
             if (roomData.status === 'active') {
-                window.showNotification('Game is already started', 'error');
-                return false;
+                window.showNotification('The game is already running. You can monitor players now.', 'info');
+                return true;
             }
             
             if ((roomData.words || []).length < roomData.gridSize * roomData.gridSize) {
@@ -187,7 +188,7 @@ class AdminController {
                 startedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
             
-            window.showNotification('Game started successfully!', 'success');
+            window.showNotification('Game started successfully! Players can now join and play.', 'success');
             
             // Assign random words to each player's grid
             await this.assignPlayerGrids(roomId);
