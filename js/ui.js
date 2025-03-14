@@ -445,8 +445,20 @@ class UIController {
             return;
         }
         
-        const grid = roomData.playerGrids[playerName];
+        const playerGrid = roomData.playerGrids[playerName];
         const gridSize = roomData.gridSize;
+        
+        // Convert flat object grid to a 2D structure for display
+        const gridCells = [];
+        for (let i = 0; i < gridSize; i++) {
+            const row = [];
+            for (let j = 0; j < gridSize; j++) {
+                const cellKey = `${i}_${j}`;
+                const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
+                row.push(cell);
+            }
+            gridCells.push(row);
+        }
         
         // Create modal for grid view
         const modal = document.createElement('div');
@@ -459,11 +471,11 @@ class UIController {
                 </div>
                 <div class="modal-body">
                     <div class="bingo-grid grid-${gridSize}">
-                        ${grid.map(row => row.map(cell => `
+                        ${gridCells.flat().map(cell => `
                             <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}">
                                 ${cell.word}
                             </div>
-                        `).join('')).join('')}
+                        `).join('')}
                     </div>
                 </div>
             </div>
@@ -522,11 +534,24 @@ class UIController {
         }
         
         // If game is active, show player's bingo grid
-        const playerGrid = roomData.playerGrids && roomData.playerGrids[playerName];
-        
-        if (!playerGrid) {
+        if (!roomData.playerGrids || !roomData.playerGrids[playerName]) {
             window.showNotification('Your bingo grid is not ready yet', 'error');
             return;
+        }
+        
+        const playerGrid = roomData.playerGrids[playerName];
+        const gridSize = roomData.gridSize;
+        
+        // Convert flat object grid to a 2D structure for display
+        const gridCells = [];
+        for (let i = 0; i < gridSize; i++) {
+            const row = [];
+            for (let j = 0; j < gridSize; j++) {
+                const cellKey = `${i}_${j}`;
+                const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
+                row.push({...cell, row: i, col: j});
+            }
+            gridCells.push(row);
         }
         
         // Create player interface
@@ -536,13 +561,13 @@ class UIController {
                 <div class="title">Stream Bingo - Room ${roomId}</div>
                 <p class="subtitle">Playing as: ${playerName}</p>
                 
-                <div class="bingo-grid grid-${roomData.gridSize}" id="playerBingoGrid">
-                    ${playerGrid.map((row, rowIndex) => row.map((cell, colIndex) => `
+                <div class="bingo-grid grid-${gridSize}" id="playerBingoGrid">
+                    ${gridCells.flat().map(cell => `
                         <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}" 
-                             data-row="${rowIndex}" data-col="${colIndex}">
+                             data-row="${cell.row}" data-col="${cell.col}">
                             ${cell.word}
                         </div>
-                    `).join('')).join('')}
+                    `).join('')}
                 </div>
                 
                 <div class="card">
@@ -562,9 +587,10 @@ class UIController {
             cell.addEventListener('click', (e) => {
                 const row = parseInt(e.target.getAttribute('data-row'));
                 const col = parseInt(e.target.getAttribute('data-col'));
+                const cellKey = `${row}_${col}`;
                 
                 // Don't allow clicking on already marked or approved cells
-                if (!playerGrid[row][col].marked && !playerGrid[row][col].approved) {
+                if (playerGrid[cellKey] && !playerGrid[cellKey].marked && !playerGrid[cellKey].approved) {
                     this.handleMarkPlayerCell(roomId, playerName, row, col);
                 }
             });
@@ -586,23 +612,36 @@ class UIController {
             const playerGrid = roomData.playerGrids[playerName];
             const gridSize = roomData.gridSize;
             
+            // Convert flat object grid to a 2D structure for display
+            const gridCells = [];
+            for (let i = 0; i < gridSize; i++) {
+                const row = [];
+                for (let j = 0; j < gridSize; j++) {
+                    const cellKey = `${i}_${j}`;
+                    const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
+                    row.push({...cell, row: i, col: j});
+                }
+                gridCells.push(row);
+            }
+            
             const bingoGridElement = document.getElementById('playerBingoGrid');
             if (bingoGridElement) {
-                bingoGridElement.innerHTML = playerGrid.map((row, rowIndex) => row.map((cell, colIndex) => `
+                bingoGridElement.innerHTML = gridCells.flat().map(cell => `
                     <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}" 
-                         data-row="${rowIndex}" data-col="${colIndex}">
+                         data-row="${cell.row}" data-col="${cell.col}">
                         ${cell.word}
                     </div>
-                `).join('')).join('');
+                `).join('');
                 
                 // Re-add event listeners
                 document.querySelectorAll('.bingo-cell').forEach(cell => {
                     cell.addEventListener('click', (e) => {
                         const row = parseInt(e.target.getAttribute('data-row'));
                         const col = parseInt(e.target.getAttribute('data-col'));
+                        const cellKey = `${row}_${col}`;
                         
                         // Don't allow clicking on already marked or approved cells
-                        if (playerGrid[row][col] && !playerGrid[row][col].marked && !playerGrid[row][col].approved) {
+                        if (playerGrid[cellKey] && !playerGrid[cellKey].marked && !playerGrid[cellKey].approved) {
                             this.handleMarkPlayerCell(roomId, playerName, row, col);
                         }
                     });
