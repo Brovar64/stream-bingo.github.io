@@ -7,19 +7,103 @@
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Modal styles */
+        .modal {
+            display: flex;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: #1E1E1E;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #FF4081;
+        }
+        
+        .close-modal {
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .approval-item {
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .approval-item div {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .approve-mark {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .reject-mark {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
         /* Global notification styles */
         .notification {
             position: fixed;
             bottom: 20px;
-            right: 20px;
-            background-color: #333;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 25px;
+            background-color: #FF4081;
             color: white;
-            padding: 12px 20px;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            font-weight: 500;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
             opacity: 0;
             transition: opacity 0.3s ease;
-            z-index: 1000;
         }
     </style>
 </head>
@@ -37,61 +121,12 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
-<!-- Direct Firebase Initialization -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        // Actual Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU",
-            authDomain: "stream-bingo-ecb40.firebaseapp.com",
-            projectId: "stream-bingo-ecb40",
-            storageBucket: "stream-bingo-ecb40.appspot.com",
-            messagingSenderId: "814141306111",
-            appId: "1:814141306111:web:319ac02de11210186408ca",
-            measurementId: "G-1DYM2MTE10"
-        };
-        
-        // Initialize Firebase
-        console.log('Initializing Firebase directly...');
-        firebase.initializeApp(firebaseConfig);
-        
-        // Initialize services
-        window.db = firebase.firestore();
-        
-        // Enable offline persistence
-        firebase.firestore().enablePersistence()
-            .catch((err) => {
-                if (err.code === 'failed-precondition') {
-                    console.warn('Multiple tabs open, persistence can only be enabled in one tab.');
-                } else if (err.code === 'unimplemented') {
-                    console.warn('Browser does not support offline persistence.');
-                }
-            });
-        
-        window.auth = firebase.auth();
-        
-        console.log('Firebase initialized successfully!');
-    } catch (error) {
-        console.error('Failed to initialize Firebase:', error);
-        
-        // Show error notification
-        const notification = document.createElement('div');
-        notification.className = 'notification';
-        notification.textContent = 'Failed to connect to database. Please check console for details.';
-        notification.style.backgroundColor = '#ff4444';
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.opacity = '1';
-        }, 10);
-    }
-});
-</script>
-
 <!-- App Scripts - Load in order -->
+<script src="js/config.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/app.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/player.js"></script>
+<script src="js/ui.js"></script>
 
 </body>
 </html>
