@@ -1,16 +1,22 @@
-// Secure Firebase Configuration Loader
-async function initializeFirebase() {
+// Temporary Firebase Configuration Helper
+// This will be replaced by the secure GitHub Actions workflow
+// but provides an immediate fix for testing
+
+function initializeFirebase() {
     try {
-        // Load Firebase configuration from the JSON file created by GitHub Actions
-        const response = await fetch('/firebase-config.json');
-        if (!response.ok) {
-            console.warn('Failed to load Firebase configuration from JSON file. The app might not work correctly.');
-            console.warn('Make sure your GitHub Actions workflow is running correctly.');
-            return;
-        }
+        // Firebase configuration with environment variable placeholders
+        // GitHub Actions will replace these with actual values during build
+        const firebaseConfig = {
+            apiKey: "{{FIREBASE_API_KEY}}",
+            authDomain: "{{FIREBASE_AUTH_DOMAIN}}",
+            projectId: "{{FIREBASE_PROJECT_ID}}",
+            storageBucket: "{{FIREBASE_STORAGE_BUCKET}}",
+            messagingSenderId: "{{FIREBASE_MESSAGING_SENDER_ID}}",
+            appId: "{{FIREBASE_APP_ID}}",
+            measurementId: "{{FIREBASE_MEASUREMENT_ID}}"
+        };
         
-        const firebaseConfig = await response.json();
-        console.log('Firebase configuration loaded successfully');
+        console.log('Attempting Firebase initialization...');
         
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -23,7 +29,6 @@ async function initializeFirebase() {
         console.log('Firebase initialized successfully');
     } catch (error) {
         console.error('Firebase initialization error:', error);
-        console.error('The app will not function correctly without proper Firebase configuration.');
     }
 }
 
