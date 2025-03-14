@@ -6,7 +6,7 @@ function initializeFirebase() {
             apiKey: "AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU",
             authDomain: "stream-bingo-ecb40.firebaseapp.com",
             projectId: "stream-bingo-ecb40",
-            storageBucket: "stream-bingo-ecb40.firebastorage.app",
+            storageBucket: "stream-bingo-ecb40.appspot.com",
             messagingSenderId: "814141306111",
             appId: "1:814141306111:web:319ac02de11210186408ca",
             measurementId: "G-1DYM2MTE10"
@@ -19,6 +19,17 @@ function initializeFirebase() {
         
         // Set up services
         window.db = firebase.firestore();
+        
+        // Enable offline persistence
+        firebase.firestore().enablePersistence()
+            .catch((err) => {
+                if (err.code === 'failed-precondition') {
+                    console.warn('Multiple tabs open, persistence can only be enabled in one tab.');
+                } else if (err.code === 'unimplemented') {
+                    console.warn('Browser does not support offline persistence.');
+                }
+            });
+        
         window.auth = firebase.auth();
         try {
             firebase.analytics();
