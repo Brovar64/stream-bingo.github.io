@@ -1,7 +1,36 @@
 // js/ui.js - Main UI entry point
 
 // This file serves as the main entry point for UI components
-// It initializes and exports the UI controllers to make them globally available
+// It initializes and sets up the basic UI functionality
+
+// Define UIBaseController directly in this file if it doesn't exist yet
+if (typeof UIBaseController === 'undefined') {
+    class UIBaseController {
+        constructor() {
+            console.log('UIBaseController initialized from ui.js');
+            this.setupEventListeners();
+        }
+
+        setupEventListeners() {
+            // Add global event listeners for UI components
+            document.addEventListener('click', (event) => {
+                // Handle global click events if needed
+            });
+        }
+
+        // Method to show notifications
+        showNotification(message, type = 'info') {
+            if (window.showNotification) {
+                window.showNotification(message, type);
+            } else {
+                console.log(`Notification (${type}): ${message}`);
+            }
+        }
+    }
+    
+    // Make it available globally
+    window.UIBaseController = UIBaseController;
+}
 
 // Wait for all UI components to load
 document.addEventListener('DOMContentLoaded', () => {
