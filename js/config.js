@@ -1,16 +1,16 @@
-// js/config.js
-const CONFIG = {
+// Global configuration object
+var CONFIG = {
   FIREBASE: {
-    apiKey: '$FIREBASE_API_KEY',
-    authDomain: '$FIREBASE_AUTH_DOMAIN',
-    projectId: '$FIREBASE_PROJECT_ID',
-    storageBucket: '$FIREBASE_STORAGE_BUCKET',
-    messagingSenderId: '$FIREBASE_MESSAGING_SENDER_ID',
-    appId: '$FIREBASE_APP_ID',
-    measurementId: '$FIREBASE_MEASUREMENT_ID'
+    apiKey: 'AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU',
+    authDomain: 'stream-bingo-ecb40.firebaseapp.com',
+    projectId: 'stream-bingo-ecb40',
+    storageBucket: 'stream-bingo-ecb40.appspot.com',
+    messagingSenderId: '814141306111',
+    appId: '1:814141306111:web:319ac02de11210186408ca',
+    measurementId: 'G-1DYM2MTE10'
   },
   TWITCH: {
-    CLIENT_ID: '$TWITCH_CLIENT_ID',
-    REDIRECT_URI: '$TWITCH_REDIRECT_URI'
+    CLIENT_ID: 'k53e9s8oc2leprhcgyoa010e38bm6s',
+    REDIRECT_URI: 'https://brovar64.github.io/stream-bingo.github.io/index.html'
   }
 };
