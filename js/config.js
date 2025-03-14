@@ -18,16 +18,16 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Initializing Firebase...');
         firebase.initializeApp(firebaseConfig);
         
-        // Initialize Firestore with cache settings
-        const firestoreSettings = {
-            cache: {
-                tabManager: true  // Enables multi-tab support
-            }
-        };
-        
         // Initialize services with public read/write permissions for development
         window.db = firebase.firestore();
-        window.db.settings(firestoreSettings);
+        
+        // Set persistence settings - using recommended approach
+        window.db.settings({
+            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+        });
+        
+        // NOTE: We've replaced enableIndexedDbPersistence() with the settings approach above
+        // which should resolve the deprecation warning
         
         // Initialize auth
         window.auth = firebase.auth();
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (error) {
         console.error('Failed to initialize Firebase:', error);
         
-        // Show error notification
+        // Show error notification using utility function if available
         if (window.showNotification) {
             window.showNotification('Failed to connect to database. Please check console for details.', 'error');
         } else {
