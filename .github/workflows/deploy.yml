@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   deploy:
@@ -14,26 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Create Configuration File
-        run: |
-          mkdir -p js
-          echo "const CONFIG = {
-            FIREBASE: {
-              apiKey: '${{ secrets.FIREBASE_API_KEY }}',
-              authDomain: '${{ secrets.FIREBASE_AUTH_DOMAIN }}',
-              projectId: '${{ secrets.FIREBASE_PROJECT_ID }}',
-              storageBucket: '${{ secrets.FIREBASE_STORAGE_BUCKET }}',
-              messagingSenderId: '${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}',
-              appId: '${{ secrets.FIREBASE_APP_ID }}',
-              measurementId: '${{ secrets.FIREBASE_MEASUREMENT_ID }}'
-            },
-            TWITCH: {
-              CLIENT_ID: '${{ secrets.TWITCH_CLIENT_ID }}',
-              REDIRECT_URI: '${{ secrets.TWITCH_REDIRECT_URI }}'
-            }
-          };" > js/config.js
+      - name: List files
+        run: ls -la
       
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
