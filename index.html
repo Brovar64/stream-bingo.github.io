@@ -37,53 +37,51 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
-<!-- Configuration -->
+<!-- Direct Firebase Initialization -->
 <script>
-// Fallback configuration in case the main one fails
-window.fallbackConfig = {
-    firebase: {
-        apiKey: "AIzaSyA-test-key-for-fallback",
-        authDomain: "test-project.firebaseapp.com",
-        projectId: "test-project", 
-        storageBucket: "test-project.appspot.com",
-        messagingSenderId: "123456789012",
-        appId: "1:123456789012:web:abcdef123456",
-        measurementId: "G-ABCDEF1234"
+// Initialize Firebase directly in index.html to avoid any loading issues
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        // Demo Firebase config with test values
+        const firebaseConfig = {
+            apiKey: "AIzaSyA-test-key-for-fallback",
+            authDomain: "test-project.firebaseapp.com",
+            projectId: "test-project",
+            storageBucket: "test-project.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456",
+            measurementId: "G-ABCDEF1234"
+        };
+        
+        // Initialize Firebase
+        console.log('Initializing Firebase directly...');
+        firebase.initializeApp(firebaseConfig);
+        
+        // Initialize services
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+        
+        console.log('Firebase initialized successfully!');
+    } catch (error) {
+        console.error('Failed to initialize Firebase:', error);
+        
+        // Show error notification
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = 'Failed to connect to database. Please check console for details.';
+        notification.style.backgroundColor = '#ff4444';
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '1';
+        }, 10);
     }
-};
+});
 </script>
 
-<!-- App Scripts -->
-<script src="js/firebase-config.js"></script>
+<!-- App Scripts - Don't need firebase-config.js anymore -->
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 
-<script>
-// Additional safety check for Firebase initialization
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        if (!window.db && window.firebase) {
-            console.log('Fallback Firebase initialization after 2 seconds...');
-            try {
-                window.db = firebase.firestore();
-                console.log('Firestore initialized via fallback');
-            } catch (e) {
-                console.error('Fallback Firebase initialization failed:', e);
-                
-                // Show error message to user
-                var notification = document.createElement('div');
-                notification.className = 'notification';
-                notification.textContent = 'Failed to connect to database. Please reload the page.';
-                notification.style.backgroundColor = '#ff4444';
-                document.body.appendChild(notification);
-                
-                setTimeout(function() {
-                    notification.style.opacity = '1';
-                }, 10);
-            }
-        }
-    }, 2000);
-});
-</script>
 </body>
 </html>
