@@ -97,6 +97,7 @@
             const info = {
                 'User Agent': navigator.userAgent,
                 'URL': window.location.href,
+                'Origin': window.location.origin,
                 'Host': window.location.hostname,
                 'Path': window.location.pathname,
                 'Protocol': window.location.protocol,
@@ -119,22 +120,34 @@
             
             try {
                 const streamBingoUser = localStorage.getItem('streamBingoUser');
+                const twitchToken = localStorage.getItem('twitchAccessToken');
+                
+                let html = '';
                 
                 if (streamBingoUser) {
                     const userData = JSON.parse(streamBingoUser);
                     
-                    storageDiv.innerHTML = `
+                    html += `
                         <p class="success">User found in local storage!</p>
                         <pre>${JSON.stringify(userData, null, 2)}</pre>
                         <p>Authentication provider: <strong>${userData.provider || 'unknown'}</strong></p>
                         <p>Username: <strong>${userData.username || 'unknown'}</strong></p>
                     `;
                 } else {
-                    storageDiv.innerHTML = `
+                    html += `
                         <p class="error">No user found in local storage.</p>
                         <p>This means you're not logged in or the authentication data was cleared.</p>
                     `;
                 }
+                
+                if (twitchToken) {
+                    html += `
+                        <p class="success">Twitch token found in storage: ${twitchToken.substring(0, 10)}...</p>
+                        <p>This token will be processed on next page load.</p>
+                    `;
+                }
+                
+                storageDiv.innerHTML = html;
             } catch (err) {
                 storageDiv.innerHTML = `
                     <p class="error">Error reading from local storage: ${err.message}</p>
@@ -148,6 +161,7 @@
             
             try {
                 localStorage.removeItem('streamBingoUser');
+                localStorage.removeItem('twitchAccessToken');
                 storageDiv.innerHTML = `
                     <p class="success">Local storage cleared successfully!</p>
                     <p>You will need to log in again when you return to the app.</p>
@@ -203,17 +217,10 @@
             const authTestDiv = document.getElementById('twitchAuthTest');
             
             // Determine the expected redirect URI based on the current hostname
-            const hostname = window.location.hostname;
-            let expectedRedirectUri = '';
-            
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                expectedRedirectUri = 'http://localhost:8080/index.html';
-            } else {
-                expectedRedirectUri = 'https://brovar64.github.io/stream-bingo/index.html';
-            }
+            const expectedRedirectUri = window.location.origin + '/twitch-redirect.html';
             
             authTestDiv.innerHTML = `
-                <p>Current hostname: <strong>${hostname}</strong></p>
+                <p>Current origin: <strong>${window.location.origin}</strong></p>
                 <p>Expected redirect URI in Twitch dashboard: <strong>${expectedRedirectUri}</strong></p>
                 <p>Make sure this matches exactly what you have configured in your Twitch Developer Console.</p>
                 <p>Redirect URI is case-sensitive and must match the URL exactly, including http/https.</p>
