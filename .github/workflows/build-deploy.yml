@@ -23,16 +23,34 @@ jobs:
         with:
           node-version: '16'
 
+      - name: Debug Secrets
+        run: |
+          echo "Checking for secret presence (not values):"
+          echo "FIREBASE_API_KEY exists: ${{ secrets.FIREBASE_API_KEY != '' }}"
+          echo "FIREBASE_AUTH_DOMAIN exists: ${{ secrets.FIREBASE_AUTH_DOMAIN != '' }}"
+          echo "FIREBASE_PROJECT_ID exists: ${{ secrets.FIREBASE_PROJECT_ID != '' }}"
+          echo "TWITCH_CLIENT_ID exists: ${{ secrets.TWITCH_CLIENT_ID != '' }}"
+
       - name: Update Firebase Config
         run: |
-          # Replace placeholders in firebase-config.js with actual values from secrets
-          sed -i 's/{{FIREBASE_API_KEY}}/${{ secrets.FIREBASE_API_KEY }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_AUTH_DOMAIN}}/${{ secrets.FIREBASE_AUTH_DOMAIN }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_PROJECT_ID}}/${{ secrets.FIREBASE_PROJECT_ID }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_STORAGE_BUCKET}}/${{ secrets.FIREBASE_STORAGE_BUCKET }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_MESSAGING_SENDER_ID}}/${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_APP_ID}}/${{ secrets.FIREBASE_APP_ID }}/g' js/firebase-config.js
-          sed -i 's/{{FIREBASE_MEASUREMENT_ID}}/${{ secrets.FIREBASE_MEASUREMENT_ID }}/g' js/firebase-config.js
+          # Use double quotes to prevent issues with special characters
+          sed -i "s/{{FIREBASE_API_KEY}}/\"${{ secrets.FIREBASE_API_KEY }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_AUTH_DOMAIN}}/\"${{ secrets.FIREBASE_AUTH_DOMAIN }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_PROJECT_ID}}/\"${{ secrets.FIREBASE_PROJECT_ID }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_STORAGE_BUCKET}}/\"${{ secrets.FIREBASE_STORAGE_BUCKET }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_MESSAGING_SENDER_ID}}/\"${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_APP_ID}}/\"${{ secrets.FIREBASE_APP_ID }}\"/g" js/firebase-config.js
+          sed -i "s/{{FIREBASE_MEASUREMENT_ID}}/\"${{ secrets.FIREBASE_MEASUREMENT_ID }}\"/g" js/firebase-config.js
+          
+          # Update Twitch credentials
+          sed -i "s/{{TWITCH_CLIENT_ID}}/\"${{ secrets.TWITCH_CLIENT_ID }}\"/g" js/auth.js
+          sed -i "s/{{TWITCH_REDIRECT_URI}}/\"${{ secrets.TWITCH_REDIRECT_URI }}\"/g" js/auth.js
+
+      - name: Display Updated Files (for debugging)
+        run: |
+          echo "=== First 10 lines of firebase-config.js ==="
+          head -n 10 js/firebase-config.js
+          echo "=========================================="
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
