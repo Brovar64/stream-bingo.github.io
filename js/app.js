@@ -1,6 +1,6 @@
 // js/app.js - Main application logic
 
-class BingoApp {
+class StreamBingo {
     constructor() {
         this.auth = window.authManager;
         
@@ -23,31 +23,31 @@ class BingoApp {
         const appDiv = document.getElementById('app');
         appDiv.innerHTML = `
             <div class="dashboard">
-                <h1>Bingo Dashboard</h1>
+                <h1>Stream Bingo</h1>
                 <p>Welcome, ${this.auth.getUsername()}</p>
                 
                 <div class="card">
                     <h2>Create a Room</h2>
                     <div class="form-group">
                         <label for="nickname">Your Nickname:</label>
-                        <input type="text" id="nickname" placeholder="Enter your nickname">
+                        <input type="text" id="nickname" class="form-control" placeholder="Enter your nickname">
                     </div>
                     <div class="form-group">
                         <label for="roomCode">Room Code:</label>
-                        <input type="text" id="roomCode" placeholder="Enter room code (4-6 chars)" maxlength="6">
+                        <input type="text" id="roomCode" class="form-control" placeholder="Enter room code (4-6 chars)" maxlength="6">
                     </div>
                     <div class="form-group">
                         <label for="gridSize">Grid Size:</label>
-                        <select id="gridSize">
+                        <select id="gridSize" class="form-control">
                             <option value="3">3x3</option>
                             <option value="5" selected>5x5</option>
                             <option value="7">7x7</option>
                         </select>
                     </div>
-                    <button id="createRoomBtn">Create Room</button>
+                    <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
                 </div>
                 
-                <button id="logoutBtn">Logout</button>
+                <button id="logoutBtn" class="btn btn-secondary">Logout</button>
             </div>
         `;
         
@@ -59,12 +59,16 @@ class BingoApp {
     loadLogin() {
         const appDiv = document.getElementById('app');
         appDiv.innerHTML = `
-            <div class="login-container">
-                <h1>Stream Bingo</h1>
-                <p>Login to create or join bingo games for your stream</p>
+            <div class="container">
+                <div class="title">Stream Bingo</div>
+                <div class="subtitle">Login to create or join bingo games for your stream</div>
                 
-                <button id="twitchLoginBtn">Login with Twitch</button>
-                <button id="testLoginBtn">Login as Test User</button>
+                <div class="form-group">
+                    <button id="twitchLoginBtn" class="btn btn-primary">Login with Twitch</button>
+                </div>
+                <div class="form-group">
+                    <button id="testLoginBtn" class="btn btn-secondary">Login as Test User</button>
+                </div>
             </div>
         `;
         
@@ -201,4 +205,4 @@ class BingoApp {
 }
 
 // Initialize the application
-window.bingoApp = new BingoApp();
+window.streamBingo = new StreamBingo();
