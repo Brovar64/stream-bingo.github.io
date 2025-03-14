@@ -24,7 +24,7 @@ class AuthManager {
         }
     }
 
-    // Rest of the existing methods from the original auth.js
+    // Existing methods from the original auth.js implementation
     loadUserFromStorage() {
         const userData = localStorage.getItem('streamBingoUser');
         if (userData) {
