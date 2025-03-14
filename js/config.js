@@ -18,19 +18,18 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Initializing Firebase...');
         firebase.initializeApp(firebaseConfig);
         
+        // Initialize Firestore with cache settings
+        const firestoreSettings = {
+            cache: {
+                tabManager: true  // Enables multi-tab support
+            }
+        };
+        
         // Initialize services with public read/write permissions for development
         window.db = firebase.firestore();
+        window.db.settings(firestoreSettings);
         
-        // Enable offline persistence
-        firebase.firestore().enablePersistence()
-            .catch((err) => {
-                if (err.code === 'failed-precondition') {
-                    console.warn('Multiple tabs open, persistence can only be enabled in one tab.');
-                } else if (err.code === 'unimplemented') {
-                    console.warn('Browser does not support offline persistence.');
-                }
-            });
-        
+        // Initialize auth
         window.auth = firebase.auth();
         
         console.log('Firebase initialized successfully!');
@@ -38,44 +37,26 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Failed to initialize Firebase:', error);
         
         // Show error notification
-        const notification = document.createElement('div');
-        notification.className = 'notification';
-        notification.textContent = 'Failed to connect to database. Please check console for details.';
-        notification.style.backgroundColor = '#ff4444';
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.opacity = '1';
-        }, 10);
+        if (window.showNotification) {
+            window.showNotification('Failed to connect to database. Please check console for details.', 'error');
+        } else {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = 'Failed to connect to database. Please check console for details.';
+            notification.style.backgroundColor = '#ff4444';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '1';
+            }, 10);
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
     }
 });
-
-// Global utility functions
-window.showNotification = function(message, type = 'info') {
-    console.log(`Notification: ${message} (${type})`);
-    
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.textContent = message;
-    
-    if (type === 'error') {
-        notification.style.backgroundColor = '#ff4444';
-    } else if (type === 'success') {
-        notification.style.backgroundColor = '#4CAF50';
-    }
-    
-    document.body.appendChild(notification);
-    
-    // Show notification
-    setTimeout(() => {
-        notification.style.opacity = '1';
-    }, 10);
-    
-    // Hide after 3 seconds
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 300);
-    }, 3000);
-};
