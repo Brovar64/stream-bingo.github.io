@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Bingo</title>
-    <link rel="stylesheet" href="css/style.css?v=20250314">
+    <link rel="stylesheet" href="css/style.css?v=20250314b">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Modal styles */
@@ -128,6 +128,31 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Error message */
+        .error-message {
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #F44336;
+            color: #fff;
+        }
+        
+        .error-message h2 {
+            color: #F44336;
+            margin-top: 0;
+        }
+        
+        .error-message button {
+            background-color: #F44336;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
     </style>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
@@ -146,22 +171,25 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
-<!-- Core App Scripts -->
-<script src="js/config.js?v=20250314"></script>
-<script src="js/utils.js?v=20250314"></script>
-<script src="js/auth.js?v=20250314"></script>
+<!-- Core Utilities -->
+<script src="js/config.js?v=20250314b"></script>
+<script src="js/utils.js?v=20250314b"></script>
+<script src="js/auth.js?v=20250314b"></script>
 
-<!-- UI Scripts - Core UI must come first -->
-<script src="js/ui_base.js?v=20250314"></script>
-<script src="js/ui_common.js?v=20250314"></script>
-<script src="js/ui_dashboard.js?v=20250314"></script>
-<script src="js/ui_admin.js?v=20250314"></script>
-<script src="js/ui_player.js?v=20250314"></script>
-<script src="js/ui.js?v=20250314"></script>
+<!-- Controllers - These should load before UI -->
+<script src="js/admin.js?v=20250314b"></script>
+<script src="js/player.js?v=20250314b"></script>
 
-<!-- Feature Scripts -->
-<script src="js/admin.js?v=20250314"></script>
-<script src="js/player.js?v=20250314"></script>
+<!-- UI Components -->
+<script src="js/ui_common.js?v=20250314b"></script>
+<script src="js/ui_dashboard.js?v=20250314b"></script>
+<script src="js/ui_admin.js?v=20250314b"></script>
+<script src="js/ui_player.js?v=20250314b"></script>
+<script src="js/ui_base.js?v=20250314b"></script>
+<script src="js/ui.js?v=20250314b"></script>
+
+<!-- Application Initialization -->
+<script src="js/app-init.js?v=20250314b"></script>
 
 </body>
 </html>
