@@ -1,689 +1,383 @@
-// js/ui.js - User interface rendering and event handling
+// js/ui.js - Main UI entry point
 
-class UIController {
-    constructor() {
-        this.auth = window.authManager;
-        this.adminController = window.adminController;
-        this.playerController = window.playerController;
-        
-        this.currentView = null;
-        this.currentRoomId = null;
-        this.currentPlayerName = null;
-        
-        // Initialize app components
-        document.addEventListener('DOMContentLoaded', () => {
-            this.initializeApp();
-        });
-    }
+// This file serves as the main entry point for UI components
+// It initializes and exports the UI controllers to make them globally available
+
+// Wait for all UI components to load
+document.addEventListener('DOMContentLoaded', () => {
+    // Add enhanced CSS styles for new UI components
+    addEnhancedStyles();
     
-    initializeApp() {
-        // Check if user is authenticated
-        if (this.auth && this.auth.isLoggedIn()) {
-            this.loadDashboard();
-        } else {
-            this.loadLogin();
-        }
-    }
-    
-    loadDashboard() {
-        const appDiv = document.getElementById('app');
-        appDiv.innerHTML = `
-            <div class="container">
-                <div class="title">Stream Bingo</div>
-                <p class="subtitle">Welcome, ${this.auth.getUsername()}</p>
-                
-                <div class="card">
-                    <h2>Create a Bingo Room (Admin)</h2>
-                    <div class="form-group">
-                        <label for="roomCode">Room Code:</label>
-                        <input type="text" id="roomCode" class="form-control" placeholder="Enter room code (4-6 chars)" maxlength="6">
-                    </div>
-                    <div class="form-group">
-                        <label for="gridSize">Grid Size:</label>
-                        <select id="gridSize" class="form-control">
-                            <option value="3">3x3</option>
-                            <option value="4">4x4</option>
-                            <option value="5" selected>5x5</option>
-                        </select>
-                    </div>
-                    <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
-                </div>
-                
-                <div class="card">
-                    <h2>Join Existing Room (Player)</h2>
-                    <div class="form-group">
-                        <label for="joinNickname">Your Nickname:</label>
-                        <input type="text" id="joinNickname" class="form-control" placeholder="Enter your nickname">
-                    </div>
-                    <div class="form-group">
-                        <label for="joinRoomCode">Room Code:</label>
-                        <input type="text" id="joinRoomCode" class="form-control" placeholder="Enter room code" maxlength="6">
-                    </div>
-                    <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-                </div>
-                
-                <div class="card">
-                    <h2>Your Created Rooms</h2>
-                    <div id="userRoomsList" class="player-list">
-                        <p>Loading your rooms...</p>
-                    </div>
-                </div>
-                
-                <button id="logoutBtn" class="btn btn-secondary">Logout</button>
-            </div>
-        `;
-        
-        // Add event listeners
-        document.getElementById('createRoomBtn').addEventListener('click', () => this.handleCreateRoom());
-        document.getElementById('joinRoomBtn').addEventListener('click', () => this.handleJoinRoom());
-        document.getElementById('logoutBtn').addEventListener('click', () => this.auth.logout());
-        
-        // Load user's rooms
-        this.loadUserRooms();
-        
-        this.currentView = 'dashboard';
-    }
-    
-    loadLogin() {
-        const appDiv = document.getElementById('app');
-        appDiv.innerHTML = `
-            <div class="container">
-                <div class="title">Stream Bingo</div>
-                <div class="subtitle">Login to create or join bingo games for your stream</div>
-                
-                <div class="form-group">
-                    <button id="twitchLoginBtn" class="btn btn-primary">Login with Twitch</button>
-                </div>
-                <div class="form-group">
-                    <button id="testLoginBtn" class="btn btn-secondary">Login as Test User</button>
-                </div>
-            </div>
-        `;
-        
-        // Add event listeners
-        document.getElementById('twitchLoginBtn').addEventListener('click', () => this.auth.loginWithTwitch());
-        document.getElementById('testLoginBtn').addEventListener('click', () => {
-            this.auth.loginWithTestAccount('admin');
-            this.loadDashboard();
-        });
-        
-        this.currentView = 'login';
-    }
-    
-    async loadUserRooms() {
-        const rooms = await this.adminController.loadUserRooms();
-        const roomsList = document.getElementById('userRoomsList');
-        
-        if (!rooms) {
-            roomsList.innerHTML = `<p class="error">Failed to load rooms. Database connection error.</p>`;
-            return;
+    // Initialize the main UI controller
+    window.uiController = new UIBaseController();
+});
+
+// Add enhanced styles for improved UI experience
+function addEnhancedStyles() {
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+        /* Enhanced loading indicator */
+        .loading-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
         }
         
-        if (rooms.length === 0) {
-            roomsList.innerHTML = `<p>You haven't created any rooms yet.</p>`;
-            return;
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 64, 129, 0.1);
+            border-radius: 50%;
+            border-top-color: #FF4081;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
         }
         
-        let roomsHTML = '';
-        rooms.forEach(room => {
-            const playerCount = room.players ? room.players.length : 0;
-            roomsHTML += `
-                <div class="player-item">
-                    <div class="player-info">
-                        <span>Room: ${room.id}</span>
-                        <span>${room.gridSize}x${room.gridSize}</span>
-                        <span>Players: ${playerCount}</span>
-                    </div>
-                    <div>
-                        <button class="enter-room btn-primary" data-room-id="${room.id}">Manage</button>
-                        <button class="delete-player" data-room-id="${room.id}">×</button>
-                    </div>
-                </div>
-            `;
-        });
-        
-        roomsList.innerHTML = roomsHTML;
-        
-        // Add event listeners for buttons
-        document.querySelectorAll('.delete-player').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const roomId = e.target.getAttribute('data-room-id');
-                if (confirm(`Are you sure you want to delete room ${roomId}?`)) {
-                    this.handleDeleteRoom(roomId);
-                }
-            });
-        });
-        
-        document.querySelectorAll('.enter-room').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const roomId = e.target.getAttribute('data-room-id');
-                this.loadAdminRoom(roomId);
-            });
-        });
-    }
-    
-    async handleCreateRoom() {
-        const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-        const gridSize = parseInt(document.getElementById('gridSize').value);
-        
-        const createdRoomId = await this.adminController.createRoom(roomCode, gridSize);
-        if (createdRoomId) {
-            this.loadAdminRoom(createdRoomId);
-        }
-    }
-    
-    async handleJoinRoom() {
-        const nickname = document.getElementById('joinNickname').value.trim();
-        const roomCode = document.getElementById('joinRoomCode').value.trim().toUpperCase();
-        
-        const roomData = await this.playerController.joinRoom(nickname, roomCode);
-        if (roomData) {
-            this.loadPlayerRoom(roomCode, nickname, roomData);
-        }
-    }
-    
-    async handleDeleteRoom(roomId) {
-        const success = await this.adminController.deleteRoom(roomId);
-        if (success) {
-            this.loadUserRooms();
-        }
-    }
-    
-    async loadAdminRoom(roomId) {
-        const roomData = await this.adminController.loadAdminRoom(roomId);
-        if (!roomData) {
-            return;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         
-        const gridSize = roomData.gridSize;
-        const words = roomData.words || [];
-        const players = roomData.players || [];
-        const pendingApprovals = roomData.pendingApprovals || [];
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
         
-        // Create admin interface
-        const appDiv = document.getElementById('app');
-        appDiv.innerHTML = `
-            <div class="container">
-                <div class="title">Admin Panel - Room ${roomId}</div>
-                <p class="subtitle">Grid Size: ${gridSize}x${gridSize}</p>
-                
-                <div class="admin-panel">
-                    <div class="admin-sidebar">
-                        <div class="card">
-                            <h2>Room Status</h2>
-                            <p>Current status: <strong>${roomData.status}</strong></p>
-                            <p>Room code: <strong>${roomId}</strong> (Share this with players)</p>
-                            <p>Players: <strong>${players.length}</strong></p>
-                            <button id="startGameBtn" class="btn btn-primary" ${words.length < gridSize * gridSize ? 'disabled' : ''}>
-                                Start Game
-                            </button>
-                            <button id="backToDashboardBtn" class="btn btn-secondary">Back to Dashboard</button>
-                        </div>
-                        
-                        <div class="card">
-                            <h2>Players</h2>
-                            <div id="playersList" class="player-list">
-                                ${players.length === 0 ? '<p>No players have joined yet.</p>' : ''}
-                                ${players.map(player => `
-                                    <div class="player-item">
-                                        <span>${player.nickname}</span>
-                                        <button class="view-player-grid" data-player="${player.nickname}">View Grid</button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="admin-main">
-                        <div class="card">
-                            <h2>Bingo Word List</h2>
-                            <p>Add at least ${gridSize * gridSize} words for your bingo grid.</p>
-                            <div class="form-group">
-                                <input type="text" id="newWord" class="form-control" placeholder="Enter a word or phrase">
-                                <button id="addWordBtn" class="btn btn-primary">Add Word</button>
-                            </div>
-                            <div id="wordList" class="bingo-words-grid">
-                                ${words.length === 0 ? '<p>No words added yet.</p>' : ''}
-                                ${words.map((word, index) => `
-                                    <div class="bingo-word">
-                                        <span>${word}</span>
-                                        <button class="delete-word" data-index="${index}">×</button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        
-                        <div class="card">
-                            <h2>Pending Approvals</h2>
-                            <div id="pendingApprovalsList">
-                                ${pendingApprovals.length === 0 ? '<p>No pending approvals.</p>' : ''}
-                                ${pendingApprovals.map((approval, index) => `
-                                    <div class="approval-item">
-                                        <p>${approval.playerName} marked "${approval.word}"</p>
-                                        <div>
-                                            <button class="approve-mark" data-index="${index}">Approve</button>
-                                            <button class="reject-mark" data-index="${index}">Reject</button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        .status-badge.setup {
+            background-color: #FFA000;
+            color: white;
+        }
         
-        // Add event listeners
-        document.getElementById('backToDashboardBtn').addEventListener('click', () => this.loadDashboard());
-        document.getElementById('addWordBtn').addEventListener('click', () => this.handleAddWord(roomId));
-        document.getElementById('startGameBtn').addEventListener('click', () => this.handleStartGame(roomId));
+        .status-badge.active {
+            background-color: #4CAF50;
+            color: white;
+        }
         
-        // Add event listeners to delete word buttons
-        document.querySelectorAll('.delete-word').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(e.target.getAttribute('data-index'));
-                this.handleDeleteWord(roomId, index);
-            });
-        });
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #333;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
         
-        // Add event listeners to view player grid buttons
-        document.querySelectorAll('.view-player-grid').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const playerName = e.target.getAttribute('data-player');
-                this.viewPlayerGrid(roomId, playerName, roomData);
-            });
-        });
+        .progress {
+            height: 100%;
+            background-color: #FF4081;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
         
-        // Add event listeners to approval buttons
-        document.querySelectorAll('.approve-mark').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(e.target.getAttribute('data-index'));
-                this.handleApprovePlayerMark(roomId, index);
-            });
-        });
+        /* Word count display */
+        .word-count-display {
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #B0BEC5;
+        }
         
-        document.querySelectorAll('.reject-mark').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(e.target.getAttribute('data-index'));
-                this.handleRejectPlayerMark(roomId, index);
-            });
-        });
+        /* Setup note */
+        .setup-note {
+            font-size: 0.8rem;
+            color: #FFA000;
+            margin-top: 5px;
+            opacity: 0;
+            height: 0;
+            transition: opacity 0.3s, height 0.3s;
+        }
         
-        // Set up real-time listener for players joining and approvals
-        this.adminController.setupRoomListener(roomId, (updatedRoomData) => {
-            this.updateAdminRoomUI(roomId, updatedRoomData);
-        });
+        .setup-note.visible {
+            opacity: 1;
+            height: 1.2em;
+        }
         
-        this.currentView = 'admin';
-        this.currentRoomId = roomId;
-    }
-    
-    updateAdminRoomUI(roomId, roomData) {
-        // Update players list
-        const playersList = document.getElementById('playersList');
-        if (playersList) {
-            const players = roomData.players || [];
-            if (players.length === 0) {
-                playersList.innerHTML = '<p>No players have joined yet.</p>';
-            } else {
-                playersList.innerHTML = players.map(player => `
-                    <div class="player-item">
-                        <span>${player.nickname}</span>
-                        <button class="view-player-grid" data-player="${player.nickname}">View Grid</button>
-                    </div>
-                `).join('');
-                
-                // Re-add event listeners
-                document.querySelectorAll('.view-player-grid').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const playerName = e.target.getAttribute('data-player');
-                        this.viewPlayerGrid(roomId, playerName, roomData);
-                    });
-                });
+        /* Button states */
+        .btn.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn.loading {
+            position: relative;
+            padding-left: 35px;
+        }
+        
+        .btn.loading:before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Game start overlay */
+        .game-start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+        
+        .game-start-overlay.fade-out {
+            opacity: 0;
+        }
+        
+        .game-start-content {
+            text-align: center;
+            background-color: #1E1E1E;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .game-start-content h2 {
+            color: #4CAF50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            animation: scale-in 0.5s ease-out;
+        }
+        
+        @keyframes scale-in {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Win celebration */
+        .win-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+        
+        .win-overlay.fade-out {
+            opacity: 0;
+        }
+        
+        .win-content {
+            text-align: center;
+            background-color: #1E1E1E;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.5);
+            animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .win-content h1 {
+            color: #FFD700;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        @keyframes bounce-in {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            70% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .toast {
+            padding: 12px 20px;
+            border-radius: 4px;
+            color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            transform: translateX(100%);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        .toast-info {
+            background-color: #2196F3;
+        }
+        
+        .toast-success {
+            background-color: #4CAF50;
+        }
+        
+        .toast-error {
+            background-color: #F44336;
+        }
+        
+        .toast-warning {
+            background-color: #FFC107;
+            color: #333;
+        }
+        
+        /* Player waiting animation */
+        .waiting-animation {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .dots {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            background-color: #FF4081;
+            border-radius: 50%;
+            animation: dot-pulse 1.5s infinite ease-in-out;
+        }
+        
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes dot-pulse {
+            0%, 100% {
+                transform: scale(0.8);
+                opacity: 0.6;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
             }
         }
         
-        // Update word list
-        const wordList = document.getElementById('wordList');
-        if (wordList) {
-            const words = roomData.words || [];
-            if (words.length === 0) {
-                wordList.innerHTML = '<p>No words added yet.</p>';
-            } else {
-                wordList.innerHTML = words.map((word, index) => `
-                    <div class="bingo-word">
-                        <span>${word}</span>
-                        <button class="delete-word" data-index="${index}">×</button>
-                    </div>
-                `).join('');
-                
-                // Re-add event listeners
-                document.querySelectorAll('.delete-word').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const index = parseInt(e.target.getAttribute('data-index'));
-                        this.handleDeleteWord(roomId, index);
-                    });
-                });
-                
-                // Update Start Game button state
-                const startGameBtn = document.getElementById('startGameBtn');
-                if (startGameBtn) {
-                    startGameBtn.disabled = words.length < roomData.gridSize * roomData.gridSize;
-                }
-            }
+        /* Status section for player UI */
+        .status-section {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 10px;
         }
         
-        // Update pending approvals list
-        const pendingApprovalsList = document.getElementById('pendingApprovalsList');
-        if (pendingApprovalsList) {
-            const pendingApprovals = roomData.pendingApprovals || [];
-            if (pendingApprovals.length === 0) {
-                pendingApprovalsList.innerHTML = '<p>No pending approvals.</p>';
-            } else {
-                pendingApprovalsList.innerHTML = pendingApprovals.map((approval, index) => `
-                    <div class="approval-item">
-                        <p>${approval.playerName} marked "${approval.word}"</p>
-                        <div>
-                            <button class="approve-mark" data-index="${index}">Approve</button>
-                            <button class="reject-mark" data-index="${index}">Reject</button>
-                        </div>
-                    </div>
-                `).join('');
-                
-                // Re-add event listeners
-                document.querySelectorAll('.approve-mark').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const index = parseInt(e.target.getAttribute('data-index'));
-                        this.handleApprovePlayerMark(roomId, index);
-                    });
-                });
-                
-                document.querySelectorAll('.reject-mark').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const index = parseInt(e.target.getAttribute('data-index'));
-                        this.handleRejectPlayerMark(roomId, index);
-                    });
-                });
-            }
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-    }
+        
+        .status-label {
+            font-size: 0.8rem;
+            color: #B0BEC5;
+        }
+        
+        .status-count {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FF4081;
+        }
+        
+        /* Game status cards in admin view */
+        .game-status-panel {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .status-card {
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            text-align: center;
+        }
+        
+        .status-card h3 {
+            font-size: 0.9rem;
+            color: #B0BEC5;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #FF4081;
+        }
+        
+        /* Modal improvements */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(3px);
+        }
+        
+        .modal-content {
+            border: 1px solid #333;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Confirm dialog */
+        .confirm-dialog {
+            padding: 10px 0;
+        }
+        
+        .confirm-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        /* Cell marking animation */
+        .bingo-cell.marking {
+            animation: pulse 0.5s;
+        }
+        
+        /* Spacing utility */
+        .mt-10 {
+            margin-top: 10px;
+        }
+    `;
     
-    async handleAddWord(roomId) {
-        const newWordInput = document.getElementById('newWord');
-        const word = newWordInput.value.trim();
-        
-        if (!word) {
-            window.showNotification('Please enter a word or phrase', 'error');
-            return;
-        }
-        
-        const success = await this.adminController.addWordToRoom(roomId, word);
-        if (success) {
-            newWordInput.value = '';
-        }
-    }
-    
-    async handleDeleteWord(roomId, index) {
-        await this.adminController.deleteWordFromRoom(roomId, index);
-    }
-    
-    async handleStartGame(roomId) {
-        // Get the current room status
-        const roomRef = window.db.collection('rooms').doc(roomId);
-        const roomDoc = await roomRef.get();
-        const roomData = roomDoc.data();
-        
-        // If the game is already active, just refresh the view
-        if (roomData.status === 'active') {
-            window.showNotification('Game is already active - refreshing view', 'success');
-            
-            // Make sure player grids are assigned
-            if (!roomData.playerGrids || Object.keys(roomData.playerGrids || {}).length === 0) {
-                await this.adminController.assignPlayerGrids(roomId);
-            }
-            
-            // Reload the admin room to show the active game
-            this.loadAdminRoom(roomId);
-            return;
-        }
-        
-        // Otherwise try to start the game
-        const success = await this.adminController.startGame(roomId);
-        if (success) {
-            // Reload the admin view to reflect the game started
-            window.showNotification('Game started successfully!', 'success');
-            this.loadAdminRoom(roomId);
-        }
-    }
-    
-    async handleApprovePlayerMark(roomId, index) {
-        await this.adminController.approvePlayerMark(roomId, index);
-    }
-    
-    async handleRejectPlayerMark(roomId, index) {
-        await this.adminController.rejectPlayerMark(roomId, index);
-    }
-    
-    viewPlayerGrid(roomId, playerName, roomData) {
-        if (!roomData.playerGrids || !roomData.playerGrids[playerName]) {
-            window.showNotification(`No grid found for player ${playerName}`, 'error');
-            return;
-        }
-        
-        const playerGrid = roomData.playerGrids[playerName];
-        const gridSize = roomData.gridSize;
-        
-        // Convert flat object grid to a 2D structure for display
-        const gridCells = [];
-        for (let i = 0; i < gridSize; i++) {
-            const row = [];
-            for (let j = 0; j < gridSize; j++) {
-                const cellKey = `${i}_${j}`;
-                const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
-                row.push(cell);
-            }
-            gridCells.push(row);
-        }
-        
-        // Create modal for grid view
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>${playerName}'s Bingo Grid</h2>
-                    <span class="close-modal">&times;</span>
-                </div>
-                <div class="modal-body">
-                    <div class="bingo-grid grid-${gridSize}">
-                        ${gridCells.flat().map(cell => `
-                            <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}">
-                                ${cell.word}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Add close button event
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        // Close modal when clicking outside
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
-    }
-    
-    async loadPlayerRoom(roomId, playerName, roomData) {
-        // Check if game has started
-        if (roomData.status !== 'active') {
-            // Show waiting screen
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = `
-                <div class="container">
-                    <div class="title">Stream Bingo - Room ${roomId}</div>
-                    <p class="subtitle">Playing as: ${playerName}</p>
-                    
-                    <div class="card">
-                        <h2>Waiting for Game to Start</h2>
-                        <p>The admin is still setting up the game. Please wait.</p>
-                        <p>Room Status: ${roomData.status}</p>
-                        <button id="backToDashboardBtn" class="btn btn-secondary">Back to Dashboard</button>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('backToDashboardBtn').addEventListener('click', () => this.loadDashboard());
-            
-            // Set up real-time listener for game status
-            this.playerController.setupPlayerListener(roomId, playerName, (updatedRoomData) => {
-                // If game has started, load player view
-                if (updatedRoomData.status === 'active') {
-                    window.showNotification('The game has started!', 'success');
-                    this.loadPlayerRoom(roomId, playerName, updatedRoomData);
-                }
-            });
-            
-            this.currentView = 'player-waiting';
-            this.currentRoomId = roomId;
-            this.currentPlayerName = playerName;
-            
-            return;
-        }
-        
-        // If game is active, show player's bingo grid
-        if (!roomData.playerGrids || !roomData.playerGrids[playerName]) {
-            window.showNotification('Your bingo grid is not ready yet', 'error');
-            return;
-        }
-        
-        const playerGrid = roomData.playerGrids[playerName];
-        const gridSize = roomData.gridSize;
-        
-        // Convert flat object grid to a 2D structure for display
-        const gridCells = [];
-        for (let i = 0; i < gridSize; i++) {
-            const row = [];
-            for (let j = 0; j < gridSize; j++) {
-                const cellKey = `${i}_${j}`;
-                const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
-                row.push({...cell, row: i, col: j});
-            }
-            gridCells.push(row);
-        }
-        
-        // Create player interface
-        const appDiv = document.getElementById('app');
-        appDiv.innerHTML = `
-            <div class="container">
-                <div class="title">Stream Bingo - Room ${roomId}</div>
-                <p class="subtitle">Playing as: ${playerName}</p>
-                
-                <div class="bingo-grid grid-${gridSize}" id="playerBingoGrid">
-                    ${gridCells.flat().map(cell => `
-                        <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}\" 
-                             data-row="${cell.row}" data-col="${cell.col}">
-                            ${cell.word}
-                        </div>
-                    `).join('')}
-                </div>
-                
-                <div class="card">
-                    <h2>Game Info</h2>
-                    <p>Click on a cell to mark it when the streamer mentions that word.</p>
-                    <p>The admin will need to approve your marks.</p>
-                    <button id="backToDashboardBtn" class="btn btn-secondary">Back to Dashboard</button>
-                </div>
-            </div>
-        `;
-        
-        // Add event listeners
-        document.getElementById('backToDashboardBtn').addEventListener('click', () => this.loadDashboard());
-        
-        // Add event listeners to the bingo cells
-        document.querySelectorAll('.bingo-cell').forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                const row = parseInt(e.target.getAttribute('data-row'));
-                const col = parseInt(e.target.getAttribute('data-col'));
-                const cellKey = `${row}_${col}`;
-                
-                // Don't allow clicking on already marked or approved cells
-                if (playerGrid[cellKey] && !playerGrid[cellKey].marked && !playerGrid[cellKey].approved) {
-                    this.handleMarkPlayerCell(roomId, playerName, row, col);
-                }
-            });
-        });
-        
-        // Set up real-time listener for grid updates
-        this.playerController.setupPlayerListener(roomId, playerName, (updatedRoomData) => {
-            this.updatePlayerRoomUI(roomId, playerName, updatedRoomData);
-        });
-        
-        this.currentView = 'player';
-        this.currentRoomId = roomId;
-        this.currentPlayerName = playerName;
-    }
-    
-    updatePlayerRoomUI(roomId, playerName, roomData) {
-        // Update player's grid if available
-        if (roomData.playerGrids && roomData.playerGrids[playerName]) {
-            const playerGrid = roomData.playerGrids[playerName];
-            const gridSize = roomData.gridSize;
-            
-            // Convert flat object grid to a 2D structure for display
-            const gridCells = [];
-            for (let i = 0; i < gridSize; i++) {
-                const row = [];
-                for (let j = 0; j < gridSize; j++) {
-                    const cellKey = `${i}_${j}`;
-                    const cell = playerGrid[cellKey] || { word: '', marked: false, approved: false };
-                    row.push({...cell, row: i, col: j});
-                }
-                gridCells.push(row);
-            }
-            
-            const bingoGridElement = document.getElementById('playerBingoGrid');
-            if (bingoGridElement) {
-                bingoGridElement.innerHTML = gridCells.flat().map(cell => `
-                    <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}\" 
-                         data-row="${cell.row}" data-col="${cell.col}">
-                        ${cell.word}
-                    </div>
-                `).join('');
-                
-                // Re-add event listeners
-                document.querySelectorAll('.bingo-cell').forEach(cell => {
-                    cell.addEventListener('click', (e) => {
-                        const row = parseInt(e.target.getAttribute('data-row'));
-                        const col = parseInt(e.target.getAttribute('data-col'));
-                        const cellKey = `${row}_${col}`;
-                        
-                        // Don't allow clicking on already marked or approved cells
-                        if (playerGrid[cellKey] && !playerGrid[cellKey].marked && !playerGrid[cellKey].approved) {
-                            this.handleMarkPlayerCell(roomId, playerName, row, col);
-                        }
-                    });
-                });
-            }
-            
-            // Check if player has won
-            if (roomData.bingoWinners && roomData.bingoWinners.includes(playerName)) {
-                window.showNotification('BINGO! You won!', 'success');
-            }
-        }
-    }
-    
-    async handleMarkPlayerCell(roomId, playerName, row, col) {
-        await this.playerController.markPlayerCell(roomId, playerName, row, col);
-    }
+    document.head.appendChild(styleEl);
 }
-
-// Initialize the application
-window.uiController = new UIController();
