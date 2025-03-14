@@ -428,7 +428,32 @@ class UIController {
     }
     
     async handleStartGame(roomId) {
-        await this.adminController.startGame(roomId);
+        // Get the current room status
+        const roomRef = window.db.collection('rooms').doc(roomId);
+        const roomDoc = await roomRef.get();
+        const roomData = roomDoc.data();
+        
+        // If the game is already active, just refresh the view
+        if (roomData.status === 'active') {
+            window.showNotification('Game is already active - refreshing view', 'success');
+            
+            // Make sure player grids are assigned
+            if (!roomData.playerGrids || Object.keys(roomData.playerGrids || {}).length === 0) {
+                await this.adminController.assignPlayerGrids(roomId);
+            }
+            
+            // Reload the admin room to show the active game
+            this.loadAdminRoom(roomId);
+            return;
+        }
+        
+        // Otherwise try to start the game
+        const success = await this.adminController.startGame(roomId);
+        if (success) {
+            // Reload the admin view to reflect the game started
+            window.showNotification('Game started successfully!', 'success');
+            this.loadAdminRoom(roomId);
+        }
     }
     
     async handleApprovePlayerMark(roomId, index) {
@@ -563,7 +588,7 @@ class UIController {
                 
                 <div class="bingo-grid grid-${gridSize}" id="playerBingoGrid">
                     ${gridCells.flat().map(cell => `
-                        <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}" 
+                        <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}\" 
                              data-row="${cell.row}" data-col="${cell.col}">
                             ${cell.word}
                         </div>
@@ -627,7 +652,7 @@ class UIController {
             const bingoGridElement = document.getElementById('playerBingoGrid');
             if (bingoGridElement) {
                 bingoGridElement.innerHTML = gridCells.flat().map(cell => `
-                    <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}" 
+                    <div class="bingo-cell ${cell.marked ? 'marked' : ''} ${cell.approved ? 'approved' : (cell.marked ? 'pending' : '')}\" 
                          data-row="${cell.row}" data-col="${cell.col}">
                         ${cell.word}
                     </div>
