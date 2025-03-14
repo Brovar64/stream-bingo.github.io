@@ -3,16 +3,16 @@ function initializeFirebase() {
     try {
         // Production Firebase configuration
         const firebaseConfig = {
-            apiKey: {{FIREBASE_API_KEY}},
-            authDomain: {{FIREBASE_AUTH_DOMAIN}},
-            projectId: {{FIREBASE_PROJECT_ID}},
-            storageBucket: {{FIREBASE_STORAGE_BUCKET}},
-            messagingSenderId: {{FIREBASE_MESSAGING_SENDER_ID}},
-            appId: {{FIREBASE_APP_ID}},
-            measurementId: {{FIREBASE_MEASUREMENT_ID}}
+            apiKey: "AIzaSyA-test-key-for-fallback",
+            authDomain: "test-project.firebaseapp.com",
+            projectId: "test-project",
+            storageBucket: "test-project.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456",
+            measurementId: "G-ABCDEF1234"
         };
         
-        console.log('Initializing Firebase with project ID:', firebaseConfig.projectId);
+        console.log('Initializing Firebase with test project ID...');
         
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -20,7 +20,11 @@ function initializeFirebase() {
         // Set up services
         window.db = firebase.firestore();
         window.auth = firebase.auth();
-        firebase.analytics();
+        try {
+            firebase.analytics();
+        } catch (e) {
+            console.log('Analytics not initialized:', e);
+        }
         
         console.log('Firebase initialized successfully');
     } catch (error) {
