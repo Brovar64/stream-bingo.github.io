@@ -18,16 +18,14 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Initializing Firebase...');
         firebase.initializeApp(firebaseConfig);
         
-        // Initialize services with public read/write permissions for development
-        window.db = firebase.firestore();
-        
-        // Set persistence settings - using recommended approach
-        window.db.settings({
+        // Initialize Firestore with cache settings
+        const firestoreSettings = {
             cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-        });
+        };
         
-        // NOTE: We've replaced enableIndexedDbPersistence() with the settings approach above
-        // which should resolve the deprecation warning
+        // Initialize services
+        window.db = firebase.firestore();
+        window.db.settings(firestoreSettings);
         
         // Initialize auth
         window.auth = firebase.auth();
