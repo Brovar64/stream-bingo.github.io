@@ -13,40 +13,18 @@ service cloud.firestore {
 }
 ```
 
-### Recommended Production Rules
-```firestore
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Rooms collection
-    match /rooms/{roomId} {
-      // Anyone can read room details
-      allow read: if true;
-      
-      // Create rooms with some basic validation
-      allow create: if request.auth != null 
-                    && request.resource.data.keys().hasAll(['createdAt', 'gridSize', 'creatorId', 'active'])
-                    && request.resource.data.gridSize is int
-                    && request.resource.data.gridSize >= 3 
-                    && request.resource.data.gridSize <= 5;
-      
-      // Update rules: Only creator can modify
-      allow update: if request.auth != null 
-                    && resource.data.creatorId == request.auth.uid;
-    }
-  }
-}
-```
+### Important Notes
+1. These DEVELOPMENT rules allow ALL access to your database
+2. NEVER use these rules in a production environment
+3. Always replace with more restrictive rules before deploying
 
-### Deployment Instructions
+### Deployment Steps
 1. Go to Firebase Console
 2. Select your project
-3. Go to Firestore Database
+3. Navigate to Firestore Database
 4. Select "Rules" tab
-5. Replace existing rules with one of the above sets
+5. Replace existing rules with the development rules above
 6. Click "Publish"
 
-### Security Considerations
-- Development rules allow ALL access - NEVER use in production
-- Production rules add basic validation and access control
-- Always test thoroughly before deploying to production
+### Security Warning
+Keeping these open rules on a live project can expose your data to unauthorized access!
