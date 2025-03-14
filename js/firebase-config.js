@@ -1,15 +1,15 @@
 // Production Firebase Configuration
 function initializeFirebase() {
     try {
-        // Actual Firebase configuration
+        // Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_ACTUAL_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "1:YOUR_APP_ID",
-            measurementId: "G-YOUR_MEASUREMENT_ID"
+            apiKey: "AIzaSyC6HO0LPJwI4tlWYlYSxw2IEGUu6Fu-fOU",
+            authDomain: "stream-bingo-ecb40.firebaseapp.com",
+            projectId: "stream-bingo-ecb40",
+            storageBucket: "stream-bingo-ecb40.firebastorage.app",
+            messagingSenderId: "814141306111",
+            appId: "1:814141306111:web:319ac02de11210186408ca",
+            measurementId: "G-1DYM2MTE10"
         };
         
         console.log('Initializing Firebase with production configuration...');
