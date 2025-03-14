@@ -215,36 +215,43 @@ class AdminController {
                 return false;
             }
             
-            // Create player grids
+            // Create player grids as objects instead of nested arrays
             const playerGrids = {};
             
             for (const player of players) {
                 // Shuffle words and pick the first gridSize*gridSize words
                 const shuffledWords = [...words].sort(() => Math.random() - 0.5).slice(0, totalCells);
                 
-                // Create grid
-                const grid = [];
+                // Create flat grid object instead of nested arrays
+                const grid = {};
+                
                 for (let i = 0; i < gridSize; i++) {
-                    const row = [];
                     for (let j = 0; j < gridSize; j++) {
                         const index = i * gridSize + j;
-                        row.push({
+                        const cellKey = `${i}_${j}`;
+                        
+                        grid[cellKey] = {
                             word: shuffledWords[index],
                             marked: false,
-                            approved: false
-                        });
+                            approved: false,
+                            row: i,
+                            col: j
+                        };
                     }
-                    grid.push(row);
                 }
                 
                 // Add free space in the middle for odd-sized grids
                 if (gridSize % 2 === 1) {
                     const middleRow = Math.floor(gridSize / 2);
                     const middleCol = Math.floor(gridSize / 2);
-                    grid[middleRow][middleCol] = {
+                    const middleCellKey = `${middleRow}_${middleCol}`;
+                    
+                    grid[middleCellKey] = {
                         word: "FREE",
                         marked: true,
-                        approved: true
+                        approved: true,
+                        row: middleRow,
+                        col: middleCol
                     };
                 }
                 
@@ -277,14 +284,15 @@ class AdminController {
             
             const approval = pendingApprovals[approvalIndex];
             const { playerName, row, col } = approval;
+            const cellKey = `${row}_${col}`;
             
             // Update player grid
             if (roomData.playerGrids && roomData.playerGrids[playerName]) {
                 const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids)); // Deep clone
                 const playerGrid = playerGrids[playerName];
                 
-                if (playerGrid[row] && playerGrid[row][col]) {
-                    playerGrid[row][col].approved = true;
+                if (playerGrid[cellKey]) {
+                    playerGrid[cellKey].approved = true;
                     
                     // Remove the approval
                     pendingApprovals.splice(approvalIndex, 1);
@@ -339,15 +347,16 @@ class AdminController {
             
             const approval = pendingApprovals[approvalIndex];
             const { playerName, row, col } = approval;
+            const cellKey = `${row}_${col}`;
             
             // Update player grid
             if (roomData.playerGrids && roomData.playerGrids[playerName]) {
                 const playerGrids = JSON.parse(JSON.stringify(roomData.playerGrids)); // Deep clone
                 const playerGrid = playerGrids[playerName];
                 
-                if (playerGrid[row] && playerGrid[row][col]) {
-                    playerGrid[row][col].marked = false;
-                    playerGrid[row][col].approved = false;
+                if (playerGrid[cellKey]) {
+                    playerGrid[cellKey].marked = false;
+                    playerGrid[cellKey].approved = false;
                     
                     // Remove the approval
                     pendingApprovals.splice(approvalIndex, 1);
@@ -370,12 +379,26 @@ class AdminController {
         }
     }
     
-    checkForBingo(grid, gridSize) {
+    checkForBingo(playerGrid, gridSize) {
+        // Convert flat object grid to check for winning patterns
+        
+        // Create a 2D array representation of the marked and approved cells
+        const grid = Array(gridSize).fill(0).map(() => Array(gridSize).fill(false));
+        
+        // Fill in the grid with marked and approved cells
+        for (const cellKey in playerGrid) {
+            const cell = playerGrid[cellKey];
+            if (cell.marked && cell.approved) {
+                const [row, col] = cellKey.split('_').map(Number);
+                grid[row][col] = true;
+            }
+        }
+        
         // Check rows
         for (let i = 0; i < gridSize; i++) {
             let rowBingo = true;
             for (let j = 0; j < gridSize; j++) {
-                if (!grid[i][j].marked || !grid[i][j].approved) {
+                if (!grid[i][j]) {
                     rowBingo = false;
                     break;
                 }
@@ -387,7 +410,7 @@ class AdminController {
         for (let j = 0; j < gridSize; j++) {
             let colBingo = true;
             for (let i = 0; i < gridSize; i++) {
-                if (!grid[i][j].marked || !grid[i][j].approved) {
+                if (!grid[i][j]) {
                     colBingo = false;
                     break;
                 }
@@ -398,7 +421,7 @@ class AdminController {
         // Check diagonal (top-left to bottom-right)
         let diag1Bingo = true;
         for (let i = 0; i < gridSize; i++) {
-            if (!grid[i][i].marked || !grid[i][i].approved) {
+            if (!grid[i][i]) {
                 diag1Bingo = false;
                 break;
             }
@@ -408,7 +431,7 @@ class AdminController {
         // Check diagonal (top-right to bottom-left)
         let diag2Bingo = true;
         for (let i = 0; i < gridSize; i++) {
-            if (!grid[i][gridSize - 1 - i].marked || !grid[i][gridSize - 1 - i].approved) {
+            if (!grid[i][gridSize - 1 - i]) {
                 diag2Bingo = false;
                 break;
             }
